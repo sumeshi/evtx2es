@@ -4,9 +4,10 @@ from setuptools import setup, find_packages
 setup(
     name='evtx2es',
     version="1.0.0",
-    author='s.nakano(j15322sn@gmail.com)',
+    author='s.nakano',
+    author_email='j15322sn@gmail.com',
     license='MIT',
-    packages=find_packages(exclude=()),
+    packages=find_packages('src', exclude=()),
     package_dir={
         '': 'src'
     },
