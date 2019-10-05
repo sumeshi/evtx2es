@@ -12,7 +12,7 @@ $ evtx2es /path/to/your/file.evtx
 or
 
 ```python
-from evtx2es import evtx2es
+from evtx2es.evtx2es import evtx2es
 
 if __name__ == '__main__':
     filepath = './foobar.evtx'
