@@ -9,12 +9,12 @@ setup(
     license='MIT',
     packages=find_packages('src', exclude=()),
     package_dir={
-        '': 'src'
+        'evtx2es': 'src'
     },
     install_requires=[require for require in Path(Path(__file__).parent, 'requirements.txt').read_text().splitlines()],
     entry_points={
         "console_scripts": [
-            "evtx2es = evtx2es:main"
+            "evtx2es = evtx2es.evtx2es:main"
         ]
     }
 )
