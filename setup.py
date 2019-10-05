@@ -7,7 +7,7 @@ setup(
     author='s.nakano',
     author_email='j15322sn@gmail.com',
     license='MIT',
-    packages=find_packages('src', exclude=()),
+    packages=find_packages(exclude=()),
     package_dir={
         'evtx2es': 'src'
     },
