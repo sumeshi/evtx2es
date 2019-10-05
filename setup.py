@@ -13,7 +13,7 @@ setup(
     install_requires=[require for require in Path(Path(__file__).parent, 'requirements.txt').read_text().splitlines()],
     entry_points={
         "console_scripts": [
-            "evtx2es = src.evtx2es:main"
+            "evtx2es = evtx2es:main"
         ]
     }
 )
