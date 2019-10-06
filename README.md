@@ -78,7 +78,8 @@ https://hub.docker.com/_/elasticsearch
 $ pip install git+https://github.com/sumeshi/evtx2es
 ```
 
-The source code for evtx2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/evtx2es).  
+The source code for evtx2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/evtx2es).
+
 Please report issues and feature requests. :sushi: :sushi: :sushi:
 
 ## License
