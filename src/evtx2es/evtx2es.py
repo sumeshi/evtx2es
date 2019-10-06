@@ -4,7 +4,7 @@ import argparse
 import traceback
 
 from pathlib import Path
-from typing import NoReturn, List
+from typing import List, Generator
 
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
@@ -14,10 +14,10 @@ from tqdm import tqdm
 
 
 class ElasticsearchUtils(object):
-    def __init__(self, hostname: str, port: int) -> NoReturn:
+    def __init__(self, hostname: str, port: int) -> None:
         self.es = Elasticsearch(host=hostname, port=port)
-    
-    def bulk_indice(self, records, index_name: str, type_name: str) -> NoReturn:
+
+    def bulk_indice(self, records, index_name: str, type_name: str) -> None:
         bulk(self.es, [
             {
                 '_index': index_name,
@@ -28,17 +28,17 @@ class ElasticsearchUtils(object):
 
 
 class Evtx2es(object):
-    def __init__(self, filepath: str) -> NoReturn:
+    def __init__(self, filepath: str) -> None:
         self.path = Path(filepath)
         self.parser = PyEvtxParser(self.path.open(mode='rb'))
 
-    def gen_json(self, size: int):
+    def gen_json(self, size: int) -> Generator:
         buffer: List[dict] = []
         for record in self.parser.records_json():
             record['data'] = json.loads(record.get('data'))
 
             buffer.append(record)
-            
+
             if len(buffer) >= size:
                 yield buffer
                 buffer.clear()
@@ -46,16 +46,15 @@ class Evtx2es(object):
             yield buffer
 
 
-def evtx2es(filepath: str, host: str = 'localhost', port: int = 9200, index: str = 'evtx2es', type: str = 'evtx2es', size: int = 500) -> NoReturn:
+def evtx2es(filepath: str, host: str = 'localhost', port: int = 9200, index: str = 'evtx2es', type: str = 'evtx2es', size: int = 500):
     es = ElasticsearchUtils(hostname=host, port=port)
     r = Evtx2es(filepath)
 
     for records in tqdm(r.gen_json(size)):
         try:
             es.bulk_indice(records, index, type)
-        except:
+        except Exception:
             traceback.print_exc()
-            
 
 
 def main():
