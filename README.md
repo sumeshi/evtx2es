@@ -57,8 +57,10 @@ evtx2es was evaluated using the sample evtx file of [JPCERT/CC:LogonTracer](http
 
 ```.bash
 $ time evtx2es ./Security.evtx
-> 4.94 user 0.06 system 0:11.84 elapsed 42%CPU
+> 6.25 user 0.13 system 0:14.08 elapsed 45%CPU
 ```
+
+See [Qiita](https://qiita.com/sumeshi/items/cb2fbafe59c2c83e3085) for more information.
 
 ### Running Environment
 ```
