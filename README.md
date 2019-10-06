@@ -1,10 +1,10 @@
 # Evtx2es
 Import Windows EventLogs(.evtx files) to ElasticSearch.
 
-Powered by [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs).  
-Inspired by [EvtxtoElk](https://github.com/dgunter/evtxtoelk).
+Life is too short and there is not enough time to process huge Windows EventLogs with pure-Python software.  
+evtx2es uses Rust library [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs), so it runs much faster than traditional software.
 
-# Usage
+## Usage
 ```bash
 $ evtx2es /path/to/your/file.evtx
 ```
@@ -15,11 +15,11 @@ or
 from evtx2es.evtx2es import evtx2es
 
 if __name__ == '__main__':
-    filepath = './foobar.evtx'
+    filepath = '/path/to/your/file.evtx'
     evtx2es(filepath)
 ```
 
-## Options
+### Options
 ```
 --host: 
     ElasticSearch host address
@@ -42,8 +42,45 @@ if __name__ == '__main__':
     (default: 500)
 ```
 
-# Install
-## via pip
+### Examples
+```
+$ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foo --type=bar --size=500
+```
+
+```py
+if __name__ == '__main__':
+    evtx2es('/path/to/your/file.evtx', host=localhost, port=9200, index='foo', type='bar', size=500)
+```
+
+## Performance Evaluations
+evtx2es was evaluated using the sample evtx file of [JPCERT/CC:LogonTracer](https://github.com/JPCERTCC/LogonTracer) (about 30MB binary data).
+
+```.bash
+$ time evtx2es ./Security.evtx
+> 4.94 user 0.06 system 0:11.84 elapsed 42%CPU
+```
+
+### Running Environment
+```
+OS: Ubuntu 18.04  
+CPU: Intel Core i5-6500  
+RAM: DDR4 32GB  
+```
+
+ElasticSearch 7.4 was running on the Docker version(Official Image).  
+https://hub.docker.com/_/elasticsearch
+
+## Installation
+### via pip
 ```
 $ pip install git+https://github.com/sumeshi/evtx2es
 ```
+
+The source code for evtx2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/evtx2es).  
+Please report issues and feature requests. :sushi: :sushi: :sushi:
+
+## License
+evtx2es is released under the [MIT](https://github.com/sumeshi/evtx2es/blob/master/LICENSE) License.
+
+Powered by [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs).  
+Inspired by [EvtxtoElk](https://github.com/dgunter/evtxtoelk).
