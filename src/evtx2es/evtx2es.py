@@ -46,11 +46,11 @@ class Evtx2es(object):
 
 
 def evtx2es(filepath: str, host: str = 'localhost', port: int = 9200, index: str = 'evtx2es', type: str = 'evtx2es', size: int = 500) -> NoReturn:
-    es = ElasticsearchUtils(hostname=hostname, port=port)
+    es = ElasticsearchUtils(hostname=host, port=port)
     r = Evtx2es(filepath)
 
     for records in tqdm(r.gen_json(size)):
-        es.bulk_indice(records, index_name, type_name)
+        es.bulk_indice(records, index, type)
 
 
 def main():
