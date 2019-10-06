@@ -45,7 +45,7 @@ class Evtx2es(object):
             yield buffer
 
 
-def evtx2es(filepath: str, hostname: str = 'localhost', port: int = 9200, index_name: str = 'evtx2es', type_name: str = 'evtx2es', size: int = 500):
+def evtx2es(filepath: str, host: str = 'localhost', port: int = 9200, index: str = 'evtx2es', type: str = 'evtx2es', size: int = 500) -> NoReturn:
     es = ElasticsearchUtils(hostname=hostname, port=port)
     r = Evtx2es(filepath)
 
@@ -59,16 +59,16 @@ def main():
     parser.add_argument('--host', default='localhost', help='ElasticSearch host address')
     parser.add_argument('--port', default=9200, help='ElasticSearch port number')
     parser.add_argument('--index', default='evtx2es', help='Index name')
-    parser.add_argument('--type', default='evtx2es', help='Type name')
-    parser.add_argument('--size', default=500, help='bulk insert size')
+    parser.add_argument('--type', default='evtx2es', help='Document type name')
+    parser.add_argument('--size', default=500, help='Bulk insert buffer size')
     args = parser.parse_args()
 
     evtx2es(
         filepath=args.evtxfile,
-        hostname=args.host,
+        host=args.host,
         port=int(args.port),
-        index_name=args.index,
-        type_name=args.type,
+        index=args.index,
+        type=args.type,
         size=int(args.size)
     )
 
