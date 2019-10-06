@@ -1,6 +1,7 @@
 # coding: utf-8
 import json
 import argparse
+import traceback
 
 from pathlib import Path
 from typing import NoReturn, List
@@ -50,7 +51,11 @@ def evtx2es(filepath: str, host: str = 'localhost', port: int = 9200, index: str
     r = Evtx2es(filepath)
 
     for records in tqdm(r.gen_json(size)):
-        es.bulk_indice(records, index, type)
+        try:
+            es.bulk_indice(records, index, type)
+        except:
+            traceback.print_exc()
+            
 
 
 def main():
