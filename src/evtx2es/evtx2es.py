@@ -44,7 +44,7 @@ class Evtx2es(object):
             try:
                 status = record.get('data').get('Event').get('EventData').get('Status')
                 if type(status) is not str:
-                    record['data']['Event']['EventData']['Status'] = str(status)
+                    record['data']['Event']['EventData']['Status'] = status + ' '
             except Exception:
                 pass
 
