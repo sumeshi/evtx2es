@@ -43,8 +43,8 @@ class Evtx2es(object):
 
             try:
                 status = record.get('data').get('Event').get('EventData').get('Status')
-                if type(status) is not str:
-                    record['data']['Event']['EventData']['Status'] = ""
+                if status and type(status) is not str:
+                    record['data']['Event']['EventData']['Status'] = status + '_'
             except Exception:
                 pass
 
