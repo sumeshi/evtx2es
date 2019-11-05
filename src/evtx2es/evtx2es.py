@@ -42,10 +42,11 @@ class Evtx2es(object):
                 record['data']['Event']['System']['EventID'] = eventid_field.get('#text')
 
             try:
-                status_field = record.get('data').get('Event').get('EventData').get('Status')
-                record['data']['Event']['EventData']['Status'] = str(statu_field) if status_field else ""
+                status = record.get('data').get('Event').get('EventData').get('Status')
+                if type(status) is not str:
+                    record['data']['Event']['EventData']['Status'] = str(status)
             except Exception:
-                record['data']['Event']['EventData']['Status'] = ""
+                pass
 
             buffer.append(record)
 
@@ -60,13 +61,11 @@ def evtx2es(filepath: str, host: str = 'localhost', port: int = 9200, index: str
     es = ElasticsearchUtils(hostname=host, port=port)
     r = Evtx2es(filepath)
 
-    for records in r.gen_json(size):
-        pass
-    #for records in tqdm(r.gen_json(size)):
-    #    try:
-    #        es.bulk_indice(records, index, type)
-    #    except Exception:
-    #        traceback.print_exc()
+    for records in tqdm(r.gen_json(size)):
+        try:
+            es.bulk_indice(records, index, type)
+        except Exception:
+            traceback.print_exc()
 
 
 def main():
