@@ -41,6 +41,9 @@ class Evtx2es(object):
             if type(eventid_field) is dict:
                 record['data']['Event']['System']['EventID'] = eventid_field.get('#text')
 
+            status_field = record.get('data').get('Event').get('EventData').get('Status')
+            record['data']['Event']['EventData']['Status'] = str(statu_field) if status_field else ""
+
             buffer.append(record)
 
             if len(buffer) >= size:
@@ -54,11 +57,13 @@ def evtx2es(filepath: str, host: str = 'localhost', port: int = 9200, index: str
     es = ElasticsearchUtils(hostname=host, port=port)
     r = Evtx2es(filepath)
 
-    for records in tqdm(r.gen_json(size)):
-        try:
-            es.bulk_indice(records, index, type)
-        except Exception:
-            traceback.print_exc()
+    for records in r.gen_json(size):
+        pass
+    #for records in tqdm(r.gen_json(size)):
+    #    try:
+    #        es.bulk_indice(records, index, type)
+    #    except Exception:
+    #        traceback.print_exc()
 
 
 def main():
