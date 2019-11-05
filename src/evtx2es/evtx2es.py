@@ -37,6 +37,10 @@ class Evtx2es(object):
         for record in self.parser.records_json():
             record['data'] = json.loads(record.get('data'))
 
+            eventid_field = record.get('data').get('Event').get('System').get('EventID')
+            if type(eventid_field) is dict:
+                record['data']['Event']['System']['EventID'] = eventid_field.get('#text')
+
             buffer.append(record)
 
             if len(buffer) >= size:
