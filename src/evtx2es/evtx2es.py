@@ -41,8 +41,11 @@ class Evtx2es(object):
             if type(eventid_field) is dict:
                 record['data']['Event']['System']['EventID'] = eventid_field.get('#text')
 
-            status_field = record.get('data').get('Event').get('EventData').get('Status')
-            record['data']['Event']['EventData']['Status'] = str(statu_field) if status_field else ""
+            try:
+                status_field = record.get('data').get('Event').get('EventData').get('Status')
+                record['data']['Event']['EventData']['Status'] = str(statu_field) if status_field else ""
+            except Exception:
+                record['data']['Event']['EventData']['Status'] = ""
 
             buffer.append(record)
 
