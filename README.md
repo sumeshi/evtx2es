@@ -4,6 +4,11 @@ Import Windows EventLogs(.evtx files) to ElasticSearch.
 Life is too short and there is not enough time to process huge Windows EventLogs with pure-Python software.  
 evtx2es uses Rust library [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs), so it runs much faster than traditional software.
 
+```
+Note: Nov 11, 2019
+    Moved main development location to gitlab
+```
+
 ## Usage
 ```bash
 $ evtx2es /path/to/your/file.evtx
