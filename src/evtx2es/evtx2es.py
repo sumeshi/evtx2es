@@ -24,7 +24,8 @@ class ElasticsearchUtils(object):
                 '_index': index_name,
                 '_type': type_name,
                 '_source': record
-            } for record in records]
+            } for record in records],
+            raise_on_error=False
         )
 
 
