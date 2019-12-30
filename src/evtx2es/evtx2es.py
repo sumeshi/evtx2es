@@ -129,7 +129,7 @@ def evtx2es(filepath: str, host: str = 'localhost', port: int = 9200, index: str
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('evtxfile', help='Windows EVTX file')
+    parser.add_argument('evtxfiles', nargs='+', type=Path, help='Windows EVTX files or directories containing them.')
     parser.add_argument('--host', default='localhost', help='ElasticSearch host address')
     parser.add_argument('--port', default=9200, help='ElasticSearch port number')
     parser.add_argument('--index', default='evtx2es', help='Index name')
@@ -137,14 +137,24 @@ def main():
     parser.add_argument('--size', default=500, help='Bulk insert buffer size')
     args = parser.parse_args()
 
-    evtx2es(
-        filepath=args.evtxfile,
-        host=args.host,
-        port=int(args.port),
-        index=args.index,
-        type=args.type,
-        size=int(args.size)
-    )
+    evtxfiles = list()
+    for evtxfile in args.evtxfiles:
+        if evtxfile.is_dir():
+            evtxfiles.extend(evtxfile.glob('**/*.evtx'))
+            evtxfiles.extend(evtxfile.glob('**/*.EVTX'))
+        else:
+            evtxfiles.append(evtxfile)
+
+    for evtxfile in evtxfiles:
+        print(f"Importing {evtxfile}")
+        evtx2es(
+            filepath=evtxfile,
+            host=args.host,
+            port=int(args.port),
+            index=args.index,
+            type=args.type,
+            size=int(args.size)
+        )
 
 
 if __name__ == '__main__':
