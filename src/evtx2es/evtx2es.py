@@ -15,8 +15,8 @@ from tqdm import tqdm
 
 
 class ElasticsearchUtils(object):
-    def __init__(self, hostname: str, port: int) -> None:
-        self.es = Elasticsearch(host=hostname, port=port)
+    def __init__(self, hostname: str, port: int, scheme: str) -> None:
+        self.es = Elasticsearch(host=hostname, port=port, scheme=scheme)
 
     def bulk_indice(self, records, index_name: str, type_name: str) -> None:
         bulk(self.es, [
@@ -116,8 +116,8 @@ class Evtx2es(object):
             yield buffer
 
 
-def evtx2es(filepath: str, host: str = 'localhost', port: int = 9200, index: str = 'evtx2es', type: str = 'evtx2es', size: int = 500):
-    es = ElasticsearchUtils(hostname=host, port=port)
+def evtx2es(filepath: str, host: str = 'localhost', port: int = 9200, index: str = 'evtx2es', type: str = 'evtx2es', size: int = 500, scheme: str = 'http'):
+    es = ElasticsearchUtils(hostname=host, port=port, scheme=scheme)
     r = Evtx2es(filepath)
 
     for records in tqdm(r.gen_json(size)):
@@ -135,8 +135,9 @@ def main():
     parser.add_argument('--index', default='evtx2es', help='Index name')
     parser.add_argument('--type', default='evtx2es', help='Document type name')
     parser.add_argument('--size', default=500, help='Bulk insert buffer size')
+    parser.add_argument('--scheme', default='http', help='Scheme to use (http, https)')
     args = parser.parse_args()
-
+    
     evtxfiles = list()
     for evtxfile in args.evtxfiles:
         if evtxfile.is_dir():
@@ -153,7 +154,8 @@ def main():
             port=int(args.port),
             index=args.index,
             type=args.type,
-            size=int(args.size)
+            size=int(args.size),
+            scheme=args.scheme
         )
 
 
