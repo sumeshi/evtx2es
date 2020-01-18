@@ -1,4 +1,6 @@
 # Evtx2es
+[![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
+
 Import Windows EventLogs(.evtx files) to ElasticSearch.
 
 Life is too short and there is not enough time to process huge Windows EventLogs with pure-Python software.  
@@ -22,6 +24,30 @@ from evtx2es.evtx2es import evtx2es
 if __name__ == '__main__':
     filepath = '/path/to/your/file.evtx'
     evtx2es(filepath)
+```
+
+### Args
+
+evtx2es supports multiple file input, all arguments are determined as file paths.
+```bash
+$ evtx2es file1.evtx file2.evtx file3.evtx
+```
+
+or 
+
+```bash
+$ tree .
+evtxfiles/
+  ├── file1.evtx
+  ├── file2.evtx
+  ├── file3.evtx
+  └── subdirectory/
+    ├── file4.evtx
+    └── subsubdirectory/
+      ├── file5.evtx
+      └── file6.evtx
+
+$ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
 ```
 
 ### Options
@@ -55,6 +81,67 @@ $ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foo --typ
 ```py
 if __name__ == '__main__':
     evtx2es('/path/to/your/file.evtx', host=localhost, port=9200, index='foo', type='bar', size=500)
+```
+
+## Output Format
+
+Using the sample evtx file of [JPCERT/CC:LogonTracer](https://github.com/JPCERTCC/LogonTracer) as an example.
+```
+[
+  {
+    "event_record_id": 227559,
+    "timestamp": "2016-10-06 01:50:49.420927 UTC",
+    "winlog": {
+      "channel": "Security",
+      "computer_name": "WIN-WFBHIBE5GXZ.example.co.jp",
+      "event_id": 4624,
+      "opcode": 0,
+      "provider_guid": "{54849625-5478-4994-a5ba-3e3b0328c30d}",
+      "provider_name": "Microsoft-Windows-Security-Auditing",
+      "record_id": 227559,
+      "task": 12544,
+      "version": 0,
+      "process": {
+        "pid": 572,
+        "thread_id": 1244
+      },
+      "event_data": {
+        "AuthenticationPackageName": "Kerberos",
+        "IpAddress": "192.168.16.102",
+        "IpPort": "49220",
+        "KeyLength": 0,
+        "LmPackageName": "-",
+        "LogonGuid": "F4DC1C19-0544-BC52-0900-DFC19752C3C6",
+        "LogonProcessName": "Kerberos",
+        "LogonType": 3,
+        "ProcessId": 0,
+        "ProcessName": "-",
+        "SubjectDomainName": "-",
+        "SubjectLogonId": "0x0",
+        "SubjectUserName": "-",
+        "SubjectUserSid": "S-1-0-0",
+        "TargetDomainName": "EXAMPLE",
+        "TargetLogonId": "0x1fa0869",
+        "TargetUserName": "WIN7_64JP_02$",
+        "TargetUserSid": "S-1-5-21-1524084746-3249201829-3114449661-1107",
+        "TransmittedServices": "-",
+        "WorkstationName": "",
+        "Status": null
+      }
+    },
+    "log": {
+      "file": {
+        "name": "sample/Security.evtx"
+      }
+    },
+    "event": {
+      "code": 4624,
+      "created": "2016-10-06T01:50:49.420927Z"
+    },
+    "@timestamp": "2016-10-06T01:50:49.420927Z"
+  },
+  ...
+]
 ```
 
 ## Performance Evaluations
