@@ -221,9 +221,7 @@ def evtx2json(filepath: str) -> List[dict]:
     """
     r = Evtx2es(filepath)
 
-    buffer: List[dict] = [
-        record for record in [records for records in tqdm(r.gen_records(500))]
-    ]
+    buffer: List[dict] = sum(list(tqdm(r.gen_records(500))), list())
     return buffer
 
 
