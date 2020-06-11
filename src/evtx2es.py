@@ -209,7 +209,25 @@ def evtx2es(
             traceback.print_exc()
 
 
-def main():
+def evtx2json(filepath: str) -> List[dict]:
+    """Convert evtx to json.
+
+    Args:
+        filepath (str): Input EventLog(evtx) file.
+
+    Note:
+        Since the content of the file is loaded into memory at once,
+        it requires the same amount of memory as the file to be loaded.
+    """
+    r = Evtx2es(filepath)
+
+    buffer: List[dict] = [
+        record for record in [records for records in tqdm(r.gen_records(500))]
+    ]
+    return buffer
+
+
+def console_evtx2es():
     """ This function is loaded when used from the console.
     """
 
@@ -255,5 +273,24 @@ def main():
     print("Import completed.")
 
 
+def console_evtx2json():
+    """ This function is loaded when used from the console.
+    """
+
+    # Args
+    parser = argparse.ArgumentParser()
+    parser.add_argument("evtxfile", type=Path, help="Windows EVTX file.")
+    parser.add_argument("jsonfile", type=Path, help="Output json file path.")
+    args = parser.parse_args()
+
+    # Convert evtx to json file.
+    print(f"Converting {args.evtxfile}")
+    o = Path(args.jsonfile)
+    o.write_text(json.dumps(evtx2json(filepath=args.evtxfile), indent=2))
+    print()
+
+    print("Convert completed.")
+
+
 if __name__ == "__main__":
-    main()
+    console_evtx2es()

@@ -19,8 +19,8 @@ or
 from evtx2es import evtx2es
 
 if __name__ == '__main__':
-    filepath = '/path/to/your/file.evtx'
-    evtx2es(filepath)
+  filepath = '/path/to/your/file.evtx'
+  evtx2es(filepath)
 ```
 
 ### Args
@@ -81,6 +81,28 @@ $ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foo --siz
 ```py
 if __name__ == '__main__':
     evtx2es('/path/to/your/file.evtx', host=localhost, port=9200, index='foo', size=500)
+```
+
+## Extra
+
+### Evtx2json
+
+Extra feature. :sushi: :sushi: :sushi:
+
+Convert from Windows Eventlog to json file.
+
+```bash
+$ evtx2json /path/to/your/file.evtx /path/to/output/target.json
+```
+
+or
+
+```python
+from evtx2es import evtx2json
+
+if __name__ == '__main__':
+  filepath = '/path/to/your/file.evtx'
+  result: List[dict] = evtx2json(filepath)
 ```
 
 ## Output Format
