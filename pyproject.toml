@@ -9,7 +9,7 @@ readme = "README.md"
 repository = "https://github.com/sumeshi/evtx2es"
 homepage = "https://github.com/sumeshi/evtx2es"
 
-keywords = ['evtx', 'elasticsearch', 'csv', 'json']
+keywords = ['evtx', 'elasticsearch']
 
 [tool.poetry.scripts]
 evtx2es = 'evtx2es:main'
