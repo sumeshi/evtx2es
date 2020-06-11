@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "evtx2es"
+version = "1.1.0"
+description = "Fast import of Windows EventLogs(.evtx) into Elasticsearch."
+authors = ["sumeshi <j15322sn@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+repository = "https://github.com/sumeshi/evtx2es"
+homepage = "https://github.com/sumeshi/evtx2es"
+
+keywords = ['evtx', 'elasticsearch', 'json']
+
+[tool.poetry.scripts]
+evtx2es = 'evtx2es:console_evtx2es'
+evtx2json = 'evtx2es:console_evtx2json'
+
+[tool.poetry.dependencies]
+python = "^3.7"
+elasticsearch = "^7.7.1"
+evtx = "^0.6.6"
+tqdm = "^4.46.1"
+urllib3 = "^1.25.9"
+
+[tool.poetry.dev-dependencies]
+mypy = "^0.780"
+flake8 = "^3.8.3"
+black = "^19.10b0"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
