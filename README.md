@@ -7,6 +7,14 @@ Fast import of Windows EventLogs(.evtx) into Elasticsearch.
 Life is too short and there is not enough time to process **huge Windows EventLogs** with **pure-Python software**.  
 evtx2es uses Rust library [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs), so it runs much faster than traditional software.
 
+```
+Note:
+  2020.06.12
+
+  I've published to PyPI!
+  https://pypi.org/project/evtx2es/
+```
+
 ## Usage
 
 ```bash
@@ -194,7 +202,7 @@ https://hub.docker.com/_/elasticsearch
 ### via pip
 
 ```
-$ pip install git+https://github.com/sumeshi/evtx2es
+$ pip install evtx2es
 ```
 
 The source code for evtx2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/evtx2es).
