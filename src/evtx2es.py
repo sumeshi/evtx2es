@@ -93,6 +93,9 @@ class Evtx2es(object):
         except KeyError:
             pass
 
+        except TypeError:
+            pass
+
         record.update(
             {
                 "log": {"file": {"name": str(self.path)}},
@@ -117,23 +120,24 @@ class Evtx2es(object):
         ):  # remove event_data fields if empty
             del record["winlog"]["event_data"]
         else:
-            for k, v in record["winlog"]["event_data"].items():
-                # Normalize some known problematic fields with values switching between integers and strings with hexadecimal notation to integers
-                if k in ("ProcessId") and type(v) == str:
-                    if v.startswith("0x"):
-                        record["winlog"]["event_data"][k] = int(v, 16)
-                    else:
-                        try:
-                            record["winlog"]["event_data"][k] = int(v)
-                        except ValueError:
-                            record["winlog"]["event_data"][k] = 0
+            if record["winlog"]["event_data"]:
+                for k, v in record["winlog"]["event_data"].items():
+                    # Normalize some known problematic fields with values switching between integers and strings with hexadecimal notation to integers
+                    if k in ("ProcessId") and type(v) == str:
+                        if v.startswith("0x"):
+                            record["winlog"]["event_data"][k] = int(v, 16)
+                        else:
+                            try:
+                                record["winlog"]["event_data"][k] = int(v)
+                            except ValueError:
+                                record["winlog"]["event_data"][k] = 0
 
-                # Maximum limit of numeric values in Elasticsearch
-                if type(v) is int:
-                    if v < -(2 ** 63):
-                        record["winlog"]["event_data"][k] = -(2 ** 63)
-                    elif v > 2 ** 63 - 1:
-                        record["winlog"]["event_data"][k] = 2 ** 63 - 1
+                    # Maximum limit of numeric values in Elasticsearch
+                    if type(v) is int:
+                        if v < -(2 ** 63):
+                            record["winlog"]["event_data"][k] = -(2 ** 63)
+                        elif v > 2 ** 63 - 1:
+                            record["winlog"]["event_data"][k] = 2 ** 63 - 1
 
         return record
 
