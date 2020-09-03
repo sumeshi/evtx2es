@@ -96,19 +96,19 @@ class Evtx2es(object):
         except TypeError:
             pass
 
-
         try:
-            record['userdata'] = {
-                'address': record['data']['Event']['UserData']['EventXML']['Address'],
-                'sessionid': record['data']['Event']['UserData']['EventXML']['SessionID'],
-                'user': record['data']['Event']['UserData']['EventXML']['User']
-                }
+            record["userdata"] = {
+                "address": record["data"]["Event"]["UserData"]["EventXML"]["Address"],
+                "sessionid": record["data"]["Event"]["UserData"]["EventXML"][
+                    "SessionID"
+                ],
+                "user": record["data"]["Event"]["UserData"]["EventXML"]["User"],
+            }
         except KeyError:
             pass
 
         except TypeError:
             pass
-
 
         record.update(
             {
