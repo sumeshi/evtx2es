@@ -15,8 +15,11 @@ from tqdm import tqdm
 
 
 class ElasticsearchUtils(object):
-    def __init__(self, hostname: str, port: int, scheme: str):
-        self.es = Elasticsearch(host=hostname, port=port, scheme=scheme)
+    def __init__(self, hostname: str, port: int, scheme: str, login: str, pwd: str):
+        if login == "":
+            self.es = Elasticsearch(host=hostname, port=port, scheme=scheme)
+        else:
+            self.es = Elasticsearch(host=hostname, port=port, scheme=scheme,verify_certs=False, http_auth=(login,pwd))
 
     def calc_hash(self, record: dict) -> str:
         """Calculate hash value from record.
@@ -187,6 +190,8 @@ def evtx2es(
     index: str = "evtx2es",
     size: int = 500,
     scheme: str = "http",
+    login: str = "",
+    pwd: str = ""
 ):
     """Fast import of Windows EventLogs(.evtx) into Elasticsearch.
 
@@ -208,8 +213,12 @@ def evtx2es(
 
         scheme (str, optional):
             Elasticsearch address scheme. Defaults to "http".
+        login (str,optional):
+            Elasticsearch login to connect into.
+        pwd (str,optional):
+            Elasticsearch password associated with the login provided.
     """
-    es = ElasticsearchUtils(hostname=host, port=port, scheme=scheme)
+    es = ElasticsearchUtils(hostname=host, port=port, scheme=scheme,login=login,pwd=pwd)
     r = Evtx2es(filepath)
 
     for records in tqdm(r.gen_records(size)):
@@ -254,6 +263,8 @@ def console_evtx2es():
     parser.add_argument("--index", default="evtx2es", help="Index name")
     parser.add_argument("--size", default=500, help="Bulk insert buffer size")
     parser.add_argument("--scheme", default="http", help="Scheme to use (http, https)")
+    parser.add_argument("--login", default="elastic", help="Login to use to connect to Elastic database")
+    parser.add_argument("--pwd", default="", help="Password associated with the login")
     args = parser.parse_args()
 
     # Target files
@@ -275,6 +286,8 @@ def console_evtx2es():
             index=args.index,
             size=int(args.size),
             scheme=args.scheme,
+            login=args.login,
+            pwd=args.pwd
         )
         print()
 

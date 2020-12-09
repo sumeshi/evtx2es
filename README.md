@@ -80,6 +80,14 @@ $ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
 --scheme:
   Scheme to use (http, or https)
   (default: http)
+
+--login:
+  The login to use if Elastic Security is enable
+  (default: )
+
+--pwd:
+  The password linked to the login provided
+  (default: )
 ```
 
 ### Examples
@@ -92,6 +100,14 @@ $ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foo --siz
 if __name__ == '__main__':
     evtx2es('/path/to/your/file.evtx', host=localhost, port=9200, index='foo', size=500)
 ```
+
+With credentials for Elastic Security:
+```
+$ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foo --size=500 --login=elastic --pwd=******
+```
+
+Note: The current version does not verify the certificate.
+
 
 ## Extra
 
