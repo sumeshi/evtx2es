@@ -19,7 +19,7 @@ class ElasticsearchUtils(object):
         if login == "":
             self.es = Elasticsearch(host=hostname, port=port, scheme=scheme)
         else:
-            self.es = Elasticsearch(host=hostname, port=port, scheme=scheme,verify_certs=False, http_auth=(login,pwd))
+            self.es = Elasticsearch(host=hostname, port=port, scheme=scheme, verify_certs=False, http_auth=(login, pwd))
 
     def calc_hash(self, record: dict) -> str:
         """Calculate hash value from record.
@@ -218,7 +218,7 @@ def evtx2es(
         pwd (str,optional):
             Elasticsearch password associated with the login provided.
     """
-    es = ElasticsearchUtils(hostname=host, port=port, scheme=scheme,login=login,pwd=pwd)
+    es = ElasticsearchUtils(hostname=host, port=port, scheme=scheme, login=login, pwd=pwd)
     r = Evtx2es(filepath)
 
     for records in tqdm(r.gen_records(size)):
