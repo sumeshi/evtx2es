@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # coding: utf-8
-import json
 import argparse
 import traceback
 from pathlib import Path
@@ -10,6 +9,7 @@ from hashlib import sha1
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
 
+import orjson
 from evtx import PyEvtxParser
 from tqdm import tqdm
 
@@ -30,7 +30,7 @@ class ElasticsearchUtils(object):
         Returns:
             str: Hash value
         """
-        return sha1(json.dumps(record, sort_keys=True).encode()).hexdigest()
+        return sha1(orjson.dumps(record, option=orjson.OPT_SORT_KEYS)).hexdigest()
 
     def bulk_indice(self, records: List[dict], index_name: str) -> None:
         """Bulk indices the documents into Elasticsearch.
@@ -55,7 +55,7 @@ class Evtx2es(object):
         self.parser = PyEvtxParser(self.path.open(mode="rb"))
 
     def format_record(self, record: dict) -> dict:
-        record["data"] = json.loads(record.get("data"))
+        record["data"] = orjson.loads(record.get("data"))
 
         eventid_field = record.get("data").get("Event").get("System").get("EventID")
         if type(eventid_field) is dict:
@@ -307,7 +307,7 @@ def console_evtx2json():
     # Convert evtx to json file.
     print(f"Converting {args.evtxfile}")
     o = Path(args.jsonfile)
-    o.write_text(json.dumps(evtx2json(filepath=args.evtxfile), indent=2))
+    o.write_text(orjson.dumps(evtx2json(filepath=args.evtxfile), option=orjson.OPT_INDENT_2).decode('utf-8'))
     print()
 
     print("Convert completed.")
