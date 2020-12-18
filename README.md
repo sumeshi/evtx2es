@@ -9,21 +9,16 @@ Fast import of Windows EventLogs(.evtx) into Elasticsearch.
 Life is too short and there is not enough time to process **huge Windows EventLogs** with **pure-Python software**.  
 evtx2es uses Rust library [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs), so it runs much faster than traditional software.
 
-```
-Note:
-  2020.06.12
-
-  I've published to PyPI!
-  https://pypi.org/project/evtx2es/
-```
 
 ## Usage
+
+When using from the commandline interface:
 
 ```bash
 $ evtx2es /path/to/your/file.evtx
 ```
 
-or
+When using from the python-script:
 
 ```python
 from evtx2es import evtx2es
@@ -33,15 +28,15 @@ if __name__ == '__main__':
   evtx2es(filepath)
 ```
 
-### Args
+### Arguments
 
-evtx2es supports multiple file input, all arguments are determined as file paths.
+evtx2es supports importing from multiple files.
 
 ```bash
 $ evtx2es file1.evtx file2.evtx file3.evtx
 ```
 
-or
+Also, possible to import recursively from a specific directory.
 
 ```bash
 $ tree .
@@ -70,11 +65,11 @@ $ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
   (default: 9200)
 
 --index:
-  Index name
+  Index name of Import destination
   (default: evtx2es)
 
 --size:
-  bulk insert size
+  Number of grouped documents during bulk insertion (Normally, It doesn't need to change this option.)
   (default: 500)
 
 --scheme:
@@ -92,24 +87,35 @@ $ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
 
 ### Examples
 
+When using from the commandline interface:
+
 ```
-$ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foo --size=500
+$ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foobar --size=500
 ```
+
+When using from the python-script:
 
 ```py
 if __name__ == '__main__':
-    evtx2es('/path/to/your/file.evtx', host=localhost, port=9200, index='foo', size=500)
+    evtx2es('/path/to/your/file.evtx', host=localhost, port=9200, index='foobar', size=500)
+```
+
+With the Amazon Elasticsearch Serivce (ES):
+
+```
+$ evtx2es /path/to/your/file.evtx --host=example.us-east-1.es.amazonaws.com --port=443 --scheme=https --index=foobar
 ```
 
 With credentials for Elastic Security:
+
 ```
-$ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foo --size=500 --login=elastic --pwd=******
+$ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foobar --login=elastic --pwd=******
 ```
 
 Note: The current version does not verify the certificate.
 
 
-## Extra
+## Appendix
 
 ### Evtx2json
 
@@ -121,7 +127,7 @@ Convert from Windows Eventlog to json file.
 $ evtx2json /path/to/your/file.evtx /path/to/output/target.json
 ```
 
-or
+Convert from Windows Eventlog to Python List[dict] object.
 
 ```python
 from evtx2es import evtx2json
@@ -131,7 +137,7 @@ if __name__ == '__main__':
   result: List[dict] = evtx2json(filepath)
 ```
 
-## Output Format
+## Output Format Example
 
 Using the sample evtx file of [JPCERT/CC:LogonTracer](https://github.com/JPCERTCC/LogonTracer) as an example.
 
