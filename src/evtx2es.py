@@ -173,7 +173,11 @@ class Evtx2es(object):
         # generates records
         for record in self.parser.records_json():
 
-            formatted_record: dict = self.format_record(record)
+            try:
+                formatted_record: dict = self.format_record(record)
+            except Exception as e:
+                print(e)
+                formatted_record = {}
             buffer.append(formatted_record)
 
             if len(buffer) >= size:
