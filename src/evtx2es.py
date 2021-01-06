@@ -57,7 +57,7 @@ class Evtx2es(object):
     def format_record(self, record: dict) -> dict:
         record["data"] = orjson.loads(record.get("data"))
 
-        eventid_field = record.get("data").get("Event").get("System").get("EventID")
+        eventid_field = record.get("data", {}).get("Event", {}).get("System", {}).get("EventID")
         if type(eventid_field) is dict:
             record["data"]["Event"]["System"]["EventID"] = eventid_field.get("#text")
 
