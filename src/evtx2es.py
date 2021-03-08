@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # coding: utf-8
-import json
 import argparse
 import traceback
 from pathlib import Path
@@ -13,13 +12,17 @@ from time import strftime
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
 
+import orjson
 from evtx import PyEvtxParser
 from tqdm import tqdm
 
 
 class ElasticsearchUtils(object):
-    def __init__(self, hostname: str, port: int, scheme: str):
-        self.es = Elasticsearch(host=hostname, port=port, scheme=scheme)
+    def __init__(self, hostname: str, port: int, scheme: str, login: str, pwd: str):
+        if login == "":
+            self.es = Elasticsearch(host=hostname, port=port, scheme=scheme)
+        else:
+            self.es = Elasticsearch(host=hostname, port=port, scheme=scheme, verify_certs=False, http_auth=(login, pwd))
 
     def calc_hash(self, record: dict) -> str:
         """Calculate hash value from record.
@@ -30,7 +33,7 @@ class ElasticsearchUtils(object):
         Returns:
             str: Hash value
         """
-        return sha1(json.dumps(record, sort_keys=True).encode()).hexdigest()
+        return sha1(orjson.dumps(record, option=orjson.OPT_SORT_KEYS)).hexdigest()
 
     def bulk_indice(self, records: List[dict], index_name: str, pipeline: str) -> None:
         """Bulk indices the documents into Elasticsearch.
@@ -55,9 +58,9 @@ class Evtx2es(object):
         self.parser = PyEvtxParser(self.path.open(mode="rb"))
 
     def format_record(self, record: dict, shift) -> dict:
-        record["data"] = json.loads(record.get("data"))
+        record["data"] = orjson.loads(record.get("data"))
 
-        eventid_field = record.get("data").get("Event").get("System").get("EventID")
+        eventid_field = record.get("data", {}).get("Event", {}).get("System", {}).get("EventID")
         if type(eventid_field) is dict:
             record["data"]["Event"]["System"]["EventID"] = eventid_field.get("#text")
 
@@ -92,6 +95,20 @@ class Evtx2es(object):
                 "thread_id": record["data"]["Event"]["System"]["Execution"][
                     "#attributes"
                 ]["ThreadID"],
+            }
+        except KeyError:
+            pass
+
+        except TypeError:
+            pass
+
+        try:
+            record["userdata"] = {
+                "address": record["data"]["Event"]["UserData"]["EventXML"]["Address"],
+                "sessionid": record["data"]["Event"]["UserData"]["EventXML"][
+                    "SessionID"
+                ],
+                "user": record["data"]["Event"]["UserData"]["EventXML"]["User"],
             }
         except KeyError:
             pass
@@ -185,6 +202,8 @@ def evtx2es(
     scheme: str = "http",
     pipeline: str = "",
     shift: str = '0',
+    login: str = "",
+    pwd: str = ""
 ):
     """Fast import of Windows EventLogs(.evtx) into Elasticsearch.
 
@@ -212,8 +231,14 @@ def evtx2es(
 
         shift (str, optional):
             Time shift for dataset. Defaults to "0".
+
+        login (str,optional):
+            Elasticsearch login to connect into.
+            
+        pwd (str,optional):
+            Elasticsearch password associated with the login provided.
     """
-    es = ElasticsearchUtils(hostname=host, port=port, scheme=scheme)
+    es = ElasticsearchUtils(hostname=host, port=port, scheme=scheme, login=login, pwd=pwd)
     r = Evtx2es(filepath)
 
     for records in tqdm(r.gen_records(size,shift)):
@@ -260,6 +285,8 @@ def console_evtx2es():
     parser.add_argument("--scheme", default="http", help="Scheme to use (http, https)")
     parser.add_argument("--pipeline", default="", help="Ingest pipeline to use")
     parser.add_argument("--datasetdate", default=0, help="Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS")   
+    parser.add_argument("--login", default="elastic", help="Login to use to connect to Elastic database")
+    parser.add_argument("--pwd", default="", help="Password associated with the login")
     args = parser.parse_args()
 
     if args.datasetdate != 0:
@@ -289,6 +316,8 @@ def console_evtx2es():
             scheme=args.scheme,
             pipeline=args.pipeline,
             shift=shift,            
+            login=args.login,
+            pwd=args.pwd
         )
         print()
 
@@ -308,7 +337,7 @@ def console_evtx2json():
     # Convert evtx to json file.
     print(f"Converting {args.evtxfile}")
     o = Path(args.jsonfile)
-    o.write_text(json.dumps(evtx2json(filepath=args.evtxfile, shift=args.shift), indent=2))
+    o.write_text(orjson.dumps(evtx2json(filepath=args.evtxfile, shift=args.shift), option=orjson.OPT_INDENT_2).decode('utf-8'))
     print()
 
     print("Convert completed.")

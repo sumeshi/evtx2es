@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "evtx2es"
-version = "1.1.5"
+version = "1.3.2"
 description = "Fast import of Windows EventLogs(.evtx) into Elasticsearch."
 authors = ["sumeshi <j15322sn@gmail.com>"]
 license = "MIT"
@@ -21,6 +21,7 @@ elasticsearch = "^7.7.1"
 evtx = "^0.6.6"
 tqdm = "^4.46.1"
 urllib3 = "^1.25.9"
+orjson = "^3.4.6"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.780"
