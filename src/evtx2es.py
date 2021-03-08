@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import List, Generator
 from hashlib import sha1
 
+from datetime import timedelta, date, datetime
+from time import strftime
+
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
 
@@ -29,21 +32,21 @@ class ElasticsearchUtils(object):
         """
         return sha1(json.dumps(record, sort_keys=True).encode()).hexdigest()
 
-    def bulk_indice(self, records: List[dict], index_name: str) -> None:
+    def bulk_indice(self, records: List[dict], index_name: str, pipeline: str) -> None:
         """Bulk indices the documents into Elasticsearch.
 
         Args:
             records (List[dict]): List of each records read from evtx files.
             index_name (str): Target Elasticsearch Index.
+            pipeline (str): Target Elasticsearch Ingest Pipeline
         """
-        bulk(
-            self.es,
-            [
-                {"_id": self.calc_hash(record), "_index": index_name, "_source": record}
-                for record in records
-            ],
-            raise_on_error=False,
-        )
+        events = []
+        for record in records:
+            event = { "_id": self.calc_hash(record), "_index": index_name, "_source": record }
+            if pipeline != "": 
+                event["pipeline"] = pipeline
+            events.append(event)
+        bulk(self.es, events, raise_on_error=False)
 
 
 class Evtx2es(object):
@@ -51,7 +54,7 @@ class Evtx2es(object):
         self.path = Path(filepath).resolve()
         self.parser = PyEvtxParser(self.path.open(mode="rb"))
 
-    def format_record(self, record: dict) -> dict:
+    def format_record(self, record: dict, shift) -> dict:
         record["data"] = json.loads(record.get("data"))
 
         eventid_field = record.get("data").get("Event").get("System").get("EventID")
@@ -107,7 +110,14 @@ class Evtx2es(object):
                 },
             }
         )
-        record["@timestamp"] = record["event"]["created"]
+        
+        #Shift timestamp
+        if shift != '0':
+            current_timestamp = datetime.strptime(record["event"]["created"], "%Y-%m-%d"'T'"%H:%M:%S.%fZ")
+            final_timestamp = current_timestamp + timedelta(seconds=shift.seconds) + timedelta(days=shift.days)
+            record["@timestamp"] = final_timestamp.strftime("%Y-%m-%d"'T'"%H:%M:%S.%fZ")
+        else: 
+            record["@timestamp"] = record["event"]["created"]
 
         # Move event attributes to ECS location
         record["winlog"]["event_data"] = record["data"]["Event"].get(
@@ -141,7 +151,7 @@ class Evtx2es(object):
 
         return record
 
-    def gen_records(self, size: int) -> Generator:
+    def gen_records(self, size: int, shift) -> Generator:
         """A generator that reads records from an Evtx file and generates a dict for each record.
 
         Args:
@@ -156,7 +166,7 @@ class Evtx2es(object):
         # generates records
         for record in self.parser.records_json():
 
-            formatted_record: dict = self.format_record(record)
+            formatted_record: dict = self.format_record(record, shift)
             buffer.append(formatted_record)
 
             if len(buffer) >= size:
@@ -173,6 +183,8 @@ def evtx2es(
     index: str = "evtx2es",
     size: int = 500,
     scheme: str = "http",
+    pipeline: str = "",
+    shift: str = '0',
 ):
     """Fast import of Windows EventLogs(.evtx) into Elasticsearch.
 
@@ -194,18 +206,24 @@ def evtx2es(
 
         scheme (str, optional):
             Elasticsearch address scheme. Defaults to "http".
+
+        pipeline (str, optional):
+            Elasticsearch Ingest Pipeline. Defaults to "".
+
+        shift (str, optional):
+            Time shift for dataset. Defaults to "0".
     """
     es = ElasticsearchUtils(hostname=host, port=port, scheme=scheme)
     r = Evtx2es(filepath)
 
-    for records in tqdm(r.gen_records(size)):
+    for records in tqdm(r.gen_records(size,shift)):
         try:
-            es.bulk_indice(records, index)
+            es.bulk_indice(records, index, pipeline)
         except Exception:
             traceback.print_exc()
 
 
-def evtx2json(filepath: str) -> List[dict]:
+def evtx2json(filepath: str, shift) -> List[dict]:
     """Convert evtx to json.
 
     Args:
@@ -217,7 +235,7 @@ def evtx2json(filepath: str) -> List[dict]:
     """
     r = Evtx2es(filepath)
 
-    buffer: List[dict] = sum(list(tqdm(r.gen_records(500))), list())
+    buffer: List[dict] = sum(list(tqdm(r.gen_records(500,shift))), list())
     return buffer
 
 
@@ -240,7 +258,15 @@ def console_evtx2es():
     parser.add_argument("--index", default="evtx2es", help="Index name")
     parser.add_argument("--size", default=500, help="Bulk insert buffer size")
     parser.add_argument("--scheme", default="http", help="Scheme to use (http, https)")
+    parser.add_argument("--pipeline", default="", help="Ingest pipeline to use")
+    parser.add_argument("--datasetdate", default=0, help="Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS")   
     args = parser.parse_args()
+
+    if args.datasetdate != 0:
+        dataset_date = datetime.strptime(args.datasetdate, '%m/%d/%Y.%H:%M:%S')
+        shift = datetime.now() - dataset_date
+    else:
+        shift = '0'
 
     # Target files
     evtxfiles = list()
@@ -261,6 +287,8 @@ def console_evtx2es():
             index=args.index,
             size=int(args.size),
             scheme=args.scheme,
+            pipeline=args.pipeline,
+            shift=shift,            
         )
         print()
 
@@ -280,7 +308,7 @@ def console_evtx2json():
     # Convert evtx to json file.
     print(f"Converting {args.evtxfile}")
     o = Path(args.jsonfile)
-    o.write_text(json.dumps(evtx2json(filepath=args.evtxfile), indent=2))
+    o.write_text(json.dumps(evtx2json(filepath=args.evtxfile, shift=args.shift), indent=2))
     print()
 
     print("Convert completed.")
