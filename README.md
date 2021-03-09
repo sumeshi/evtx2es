@@ -76,6 +76,14 @@ $ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
   Scheme to use (http, or https)
   (default: http)
 
+--pipeline
+  Elasticsearch Ingest Pipeline to use
+  (default: )
+
+--datasetdate
+  Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS
+  (default: 0)
+
 --login:
   The login to use if Elastic Security is enable
   (default: )
