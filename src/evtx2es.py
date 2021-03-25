@@ -16,11 +16,13 @@ import orjson
 from evtx import PyEvtxParser
 from tqdm import tqdm
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class ElasticsearchUtils(object):
     def __init__(self, hostname: str, port: int, scheme: str, login: str, pwd: str):
         if login == "":
-            self.es = Elasticsearch(host=hostname, port=port, scheme=scheme)
+            self.es = Elasticsearch(host=hostname, port=port, scheme=scheme, verify_certs=False)
         else:
             self.es = Elasticsearch(host=hostname, port=port, scheme=scheme, verify_certs=False, http_auth=(login, pwd))
 
@@ -285,7 +287,7 @@ def console_evtx2es():
     parser.add_argument("--scheme", default="http", help="Scheme to use (http, https)")
     parser.add_argument("--pipeline", default="", help="Ingest pipeline to use")
     parser.add_argument("--datasetdate", default=0, help="Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS")
-    parser.add_argument("--login", default="elastic", help="Login to use to connect to Elastic database")
+    parser.add_argument("--login", default="", help="Login to use to connect to Elastic database")
     parser.add_argument("--pwd", default="", help="Password associated with the login")
     args = parser.parse_args()
 
