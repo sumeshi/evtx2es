@@ -234,15 +234,15 @@ https://hub.docker.com/_/elasticsearch
 
 ## Installation
 
-### via pip
-
+### via PyPI
 ```
 $ pip install evtx2es
 ```
 
-The source code for evtx2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/evtx2es).
-
-Please report issues and feature requests. :sushi: :sushi: :sushi:
+### via DockerHub
+```
+$ docker pull sumeshi/evtx2es:latest
+```
 
 ## Run with Docker
 https://hub.docker.com/r/sumeshi/evtx2es
@@ -262,6 +262,13 @@ $ docker run -t --rm -v $(pwd):/app sumeshi/evtx2es:latest evtx2es Security.evtx
 
 Do not use the "latest" image if at all possible.  
 The "latest" image is not a released version, but is built from the contents of the master branch.
+
+## Contributing
+
+[CONTRIBUTING](https://github.com/sumeshi/evtx2es/blob/master/CONTRIBUTING)
+
+The source code for evtx2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/evtx2es).
+Please report issues and feature requests. :sushi: :sushi: :sushi:
 
 ## License
 
