@@ -265,7 +265,7 @@ The "latest" image is not a released version, but is built from the contents of 
 
 ## Contributing
 
-[CONTRIBUTING](https://github.com/sumeshi/evtx2es/blob/master/CONTRIBUTING)
+[CONTRIBUTING](https://github.com/sumeshi/evtx2es/blob/master/CONTRIBUTING.md)
 
 The source code for evtx2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/evtx2es).
 Please report issues and feature requests. :sushi: :sushi: :sushi:
