@@ -20,7 +20,7 @@ python = "^3.7"
 elasticsearch = "^7.7.1"
 evtx = "^0.6.6"
 tqdm = "^4.46.1"
-urllib3 = "^1.25.9"
+urllib3 = "^1.26.5"
 orjson = "^3.4.6"
 
 [tool.poetry.dev-dependencies]
