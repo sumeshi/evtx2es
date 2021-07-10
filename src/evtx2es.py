@@ -340,7 +340,7 @@ def console_evtx2json():
     # Convert evtx to json file.
     print(f"Converting {args.evtxfile}")
     o = Path(args.jsonfile)
-    o.write_text(orjson.dumps(evtx2json(filepath=args.evtxfile, shift=args.shift), option=orjson.OPT_INDENT_2).decode('utf-8'))
+    o.write_text(orjson.dumps(evtx2json(filepath=args.evtxfile), option=orjson.OPT_INDENT_2).decode('utf-8'))
     print()
 
     print("Convert completed.")
