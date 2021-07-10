@@ -260,7 +260,7 @@ $ docker run -t --rm -v $(pwd):/app sumeshi/evtx2es:latest evtx2es Security.evtx
 $ docker run -t --rm -v $(pwd):/app sumeshi/evtx2es:latest evtx2es Security.evtx out.json
 ```
 
-Do not use the "latest" image if at all possible.
+Do not use the "latest" image if at all possible.  
 The "latest" image is not a released version, but is built from the contents of the master branch.
 
 ## License
