@@ -19,6 +19,7 @@ from tqdm import tqdm
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
 class ElasticsearchUtils(object):
     def __init__(self, hostname: str, port: int, scheme: str, login: str, pwd: str):
         if login == "":
