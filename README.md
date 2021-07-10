@@ -252,12 +252,12 @@ https://hub.docker.com/r/sumeshi/evtx2es
 ```bash
 # "host.docker.internal" is only available in mac and windows environments.
 # For linux, use the --add-host option.
-$ docker run -t --rm -v $(pwd):/app sumeshi/evtx2es:latest evtx2es Security.evtx --host=host.docker.internal
+$ docker run -t --rm -v $(pwd):/app/work sumeshi/evtx2es:latest evtx2es /app/work/Security.evtx --host=host.docker.internal
 ```
 
 ## evtx2json
 ```bash
-$ docker run -t --rm -v $(pwd):/app sumeshi/evtx2es:latest evtx2es Security.evtx out.json
+$ docker run -t --rm -v $(pwd):/app/work sumeshi/evtx2es:latest evtx2es /app/work/Security.evtx /app/work/out.json
 ```
 
 Do not use the "latest" image if at all possible.  
