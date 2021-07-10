@@ -335,12 +335,19 @@ def console_evtx2json():
     parser = argparse.ArgumentParser()
     parser.add_argument("evtxfile", type=Path, help="Windows EVTX file.")
     parser.add_argument("jsonfile", type=Path, help="Output json file path.")
+    parser.add_argument("--datasetdate", default=0, help="Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS")
     args = parser.parse_args()
+
+    if args.datasetdate != 0:
+        dataset_date = datetime.strptime(args.datasetdate, '%m/%d/%Y.%H:%M:%S')
+        shift = datetime.now() - dataset_date
+    else:
+        shift = '0'
 
     # Convert evtx to json file.
     print(f"Converting {args.evtxfile}")
     o = Path(args.jsonfile)
-    o.write_text(orjson.dumps(evtx2json(filepath=args.evtxfile), option=orjson.OPT_INDENT_2).decode('utf-8'))
+    o.write_text(orjson.dumps(evtx2json(filepath=args.evtxfile, shift=shift), option=orjson.OPT_INDENT_2).decode('utf-8'))
     print()
 
     print("Convert completed.")
