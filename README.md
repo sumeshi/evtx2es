@@ -3,6 +3,9 @@
 [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
 [![PyPI version](https://badge.fury.io/py/evtx2es.svg)](https://badge.fury.io/py/evtx2es)
 [![Python Versions](https://img.shields.io/pypi/pyversions/evtx2es.svg)](https://pypi.org/project/evtx2es/)
+[![DockerHub Status](https://shields.io/docker/cloud/build/sumeshi/evtx2es)](https://hub.docker.com/r/sumeshi/evtx2es)
+
+![evtx2es logo](https://gist.githubusercontent.com/sumeshi/c2f430d352ae763273faadf9616a29e5/raw/1bf24feb55571bf7f0c7d8d4cb04bd0a511120f2/evtx2es.svg)
 
 Fast import of Windows EventLogs(.evtx) into Elasticsearch.
 
@@ -240,6 +243,25 @@ $ pip install evtx2es
 The source code for evtx2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/evtx2es).
 
 Please report issues and feature requests. :sushi: :sushi: :sushi:
+
+## Run with Docker
+https://hub.docker.com/r/sumeshi/evtx2es
+
+
+## evtx2es
+```bash
+# "host.docker.internal" is only available in mac and windows environments.
+# For linux, use the --add-host option.
+$ docker run -t --rm -v $(pwd):/app sumeshi/evtx2es:latest evtx2es Security.evtx --host=host.docker.internal
+```
+
+## evtx2json
+```bash
+$ docker run -t --rm -v $(pwd):/app sumeshi/evtx2es:latest evtx2es Security.evtx out.json
+```
+
+Do not use the "latest" image if at all possible.
+The "latest" image is not a released version, but is built from the contents of the master branch.
 
 ## License
 
