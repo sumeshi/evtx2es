@@ -1,22 +1,31 @@
 #!/usr/bin/env python3
 # coding: utf-8
-import json
+
 import argparse
 import traceback
 from pathlib import Path
 from typing import List, Generator
 from hashlib import sha1
 
+from datetime import timedelta, datetime
+
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
 
+import orjson
 from evtx import PyEvtxParser
 from tqdm import tqdm
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 class ElasticsearchUtils(object):
-    def __init__(self, hostname: str, port: int, scheme: str):
-        self.es = Elasticsearch(host=hostname, port=port, scheme=scheme)
+    def __init__(self, hostname: str, port: int, scheme: str, login: str, pwd: str):
+        if login == "":
+            self.es = Elasticsearch(host=hostname, port=port, scheme=scheme, verify_certs=False)
+        else:
+            self.es = Elasticsearch(host=hostname, port=port, scheme=scheme, verify_certs=False, http_auth=(login, pwd))
 
     def calc_hash(self, record: dict) -> str:
         """Calculate hash value from record.
@@ -27,23 +36,23 @@ class ElasticsearchUtils(object):
         Returns:
             str: Hash value
         """
-        return sha1(json.dumps(record, sort_keys=True).encode()).hexdigest()
+        return sha1(orjson.dumps(record, option=orjson.OPT_SORT_KEYS)).hexdigest()
 
-    def bulk_indice(self, records: List[dict], index_name: str) -> None:
+    def bulk_indice(self, records: List[dict], index_name: str, pipeline: str) -> None:
         """Bulk indices the documents into Elasticsearch.
 
         Args:
             records (List[dict]): List of each records read from evtx files.
             index_name (str): Target Elasticsearch Index.
+            pipeline (str): Target Elasticsearch Ingest Pipeline
         """
-        bulk(
-            self.es,
-            [
-                {"_id": self.calc_hash(record), "_index": index_name, "_source": record}
-                for record in records
-            ],
-            raise_on_error=False,
-        )
+        events = []
+        for record in records:
+            event = {"_id": self.calc_hash(record), "_index": index_name, "_source": record}
+            if pipeline != "":
+                event["pipeline"] = pipeline
+            events.append(event)
+        bulk(self.es, events, raise_on_error=False)
 
 
 class Evtx2es(object):
@@ -51,10 +60,10 @@ class Evtx2es(object):
         self.path = Path(filepath).resolve()
         self.parser = PyEvtxParser(self.path.open(mode="rb"))
 
-    def format_record(self, record: dict) -> dict:
-        record["data"] = json.loads(record.get("data"))
+    def format_record(self, record: dict, shift) -> dict:
+        record["data"] = orjson.loads(record.get("data"))
 
-        eventid_field = record.get("data").get("Event").get("System").get("EventID")
+        eventid_field = record.get("data", {}).get("Event", {}).get("System", {}).get("EventID")
         if type(eventid_field) is dict:
             record["data"]["Event"]["System"]["EventID"] = eventid_field.get("#text")
 
@@ -93,6 +102,23 @@ class Evtx2es(object):
         except KeyError:
             pass
 
+        except TypeError:
+            pass
+
+        try:
+            record["userdata"] = {
+                "address": record["data"]["Event"]["UserData"]["EventXML"]["Address"],
+                "sessionid": record["data"]["Event"]["UserData"]["EventXML"][
+                    "SessionID"
+                ],
+                "user": record["data"]["Event"]["UserData"]["EventXML"]["User"],
+            }
+        except KeyError:
+            pass
+
+        except TypeError:
+            pass
+
         record.update(
             {
                 "log": {"file": {"name": str(self.path)}},
@@ -104,7 +130,14 @@ class Evtx2es(object):
                 },
             }
         )
-        record["@timestamp"] = record["event"]["created"]
+
+        # Shift timestamp
+        if shift != '0':
+            current_timestamp = datetime.strptime(record["event"]["created"], "%Y-%m-%d"'T'"%H:%M:%S.%fZ")
+            final_timestamp = current_timestamp + timedelta(seconds=shift.seconds) + timedelta(days=shift.days)
+            record["@timestamp"] = final_timestamp.strftime("%Y-%m-%d"'T'"%H:%M:%S.%fZ")
+        else:
+            record["@timestamp"] = record["event"]["created"]
 
         # Move event attributes to ECS location
         record["winlog"]["event_data"] = record["data"]["Event"].get(
@@ -117,27 +150,28 @@ class Evtx2es(object):
         ):  # remove event_data fields if empty
             del record["winlog"]["event_data"]
         else:
-            for k, v in record["winlog"]["event_data"].items():
-                # Normalize some known problematic fields with values switching between integers and strings with hexadecimal notation to integers
-                if k in ("ProcessId") and type(v) == str:
-                    if v.startswith("0x"):
-                        record["winlog"]["event_data"][k] = int(v, 16)
-                    else:
-                        try:
-                            record["winlog"]["event_data"][k] = int(v)
-                        except ValueError:
-                            record["winlog"]["event_data"][k] = 0
+            if record["winlog"]["event_data"]:
+                for k, v in record["winlog"]["event_data"].items():
+                    # Normalize some known problematic fields with values switching between integers and strings with hexadecimal notation to integers
+                    if k in ("ProcessId") and type(v) == str:
+                        if v.startswith("0x"):
+                            record["winlog"]["event_data"][k] = int(v, 16)
+                        else:
+                            try:
+                                record["winlog"]["event_data"][k] = int(v)
+                            except ValueError:
+                                record["winlog"]["event_data"][k] = 0
 
-                # Maximum limit of numeric values in Elasticsearch
-                if type(v) is int:
-                    if v < -(2 ** 63):
-                        record["winlog"]["event_data"][k] = -(2 ** 63)
-                    elif v > 2 ** 63 - 1:
-                        record["winlog"]["event_data"][k] = 2 ** 63 - 1
+                    # Maximum limit of numeric values in Elasticsearch
+                    if type(v) is int:
+                        if v < -(2 ** 63):
+                            record["winlog"]["event_data"][k] = -(2 ** 63)
+                        elif v > 2 ** 63 - 1:
+                            record["winlog"]["event_data"][k] = 2 ** 63 - 1
 
         return record
 
-    def gen_records(self, size: int) -> Generator:
+    def gen_records(self, size: int, shift) -> Generator:
         """A generator that reads records from an Evtx file and generates a dict for each record.
 
         Args:
@@ -152,7 +186,7 @@ class Evtx2es(object):
         # generates records
         for record in self.parser.records_json():
 
-            formatted_record: dict = self.format_record(record)
+            formatted_record: dict = self.format_record(record, shift)
             buffer.append(formatted_record)
 
             if len(buffer) >= size:
@@ -169,6 +203,10 @@ def evtx2es(
     index: str = "evtx2es",
     size: int = 500,
     scheme: str = "http",
+    pipeline: str = "",
+    shift: str = '0',
+    login: str = "",
+    pwd: str = ""
 ):
     """Fast import of Windows EventLogs(.evtx) into Elasticsearch.
 
@@ -190,18 +228,30 @@ def evtx2es(
 
         scheme (str, optional):
             Elasticsearch address scheme. Defaults to "http".
+
+        pipeline (str, optional):
+            Elasticsearch Ingest Pipeline. Defaults to "".
+
+        shift (str, optional):
+            Time shift for dataset. Defaults to "0".
+
+        login (str, optional):
+            Elasticsearch login to connect into.
+
+        pwd (str, optional):
+            Elasticsearch password associated with the login provided.
     """
-    es = ElasticsearchUtils(hostname=host, port=port, scheme=scheme)
+    es = ElasticsearchUtils(hostname=host, port=port, scheme=scheme, login=login, pwd=pwd)
     r = Evtx2es(filepath)
 
-    for records in tqdm(r.gen_records(size)):
+    for records in tqdm(r.gen_records(size, shift)):
         try:
-            es.bulk_indice(records, index)
+            es.bulk_indice(records, index, pipeline)
         except Exception:
             traceback.print_exc()
 
 
-def evtx2json(filepath: str) -> List[dict]:
+def evtx2json(filepath: str, shift) -> List[dict]:
     """Convert evtx to json.
 
     Args:
@@ -213,7 +263,7 @@ def evtx2json(filepath: str) -> List[dict]:
     """
     r = Evtx2es(filepath)
 
-    buffer: List[dict] = sum(list(tqdm(r.gen_records(500))), list())
+    buffer: List[dict] = sum(list(tqdm(r.gen_records(500, shift))), list())
     return buffer
 
 
@@ -236,7 +286,17 @@ def console_evtx2es():
     parser.add_argument("--index", default="evtx2es", help="Index name")
     parser.add_argument("--size", default=500, help="Bulk insert buffer size")
     parser.add_argument("--scheme", default="http", help="Scheme to use (http, https)")
+    parser.add_argument("--pipeline", default="", help="Ingest pipeline to use")
+    parser.add_argument("--datasetdate", default=0, help="Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS")
+    parser.add_argument("--login", default="", help="Login to use to connect to Elastic database")
+    parser.add_argument("--pwd", default="", help="Password associated with the login")
     args = parser.parse_args()
+
+    if args.datasetdate != 0:
+        dataset_date = datetime.strptime(args.datasetdate, '%m/%d/%Y.%H:%M:%S')
+        shift = datetime.now() - dataset_date
+    else:
+        shift = '0'
 
     # Target files
     evtxfiles = list()
@@ -257,6 +317,10 @@ def console_evtx2es():
             index=args.index,
             size=int(args.size),
             scheme=args.scheme,
+            pipeline=args.pipeline,
+            shift=shift,
+            login=args.login,
+            pwd=args.pwd
         )
         print()
 
@@ -271,12 +335,19 @@ def console_evtx2json():
     parser = argparse.ArgumentParser()
     parser.add_argument("evtxfile", type=Path, help="Windows EVTX file.")
     parser.add_argument("jsonfile", type=Path, help="Output json file path.")
+    parser.add_argument("--datasetdate", default=0, help="Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS")
     args = parser.parse_args()
+
+    if args.datasetdate != 0:
+        dataset_date = datetime.strptime(args.datasetdate, '%m/%d/%Y.%H:%M:%S')
+        shift = datetime.now() - dataset_date
+    else:
+        shift = '0'
 
     # Convert evtx to json file.
     print(f"Converting {args.evtxfile}")
     o = Path(args.jsonfile)
-    o.write_text(json.dumps(evtx2json(filepath=args.evtxfile), indent=2))
+    o.write_text(orjson.dumps(evtx2json(filepath=args.evtxfile, shift=shift), option=orjson.OPT_INDENT_2).decode('utf-8'))
     print()
 
     print("Convert completed.")

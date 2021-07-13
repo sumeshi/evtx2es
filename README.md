@@ -1,29 +1,27 @@
-# Evtx2es
+# evtx2es
 
 [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
 [![PyPI version](https://badge.fury.io/py/evtx2es.svg)](https://badge.fury.io/py/evtx2es)
 [![Python Versions](https://img.shields.io/pypi/pyversions/evtx2es.svg)](https://pypi.org/project/evtx2es/)
+[![DockerHub Status](https://shields.io/docker/cloud/build/sumeshi/evtx2es)](https://hub.docker.com/r/sumeshi/evtx2es)
+
+![evtx2es logo](https://gist.githubusercontent.com/sumeshi/c2f430d352ae763273faadf9616a29e5/raw/1bf24feb55571bf7f0c7d8d4cb04bd0a511120f2/evtx2es.svg)
 
 Fast import of Windows EventLogs(.evtx) into Elasticsearch.
 
 Life is too short and there is not enough time to process **huge Windows EventLogs** with **pure-Python software**.  
 evtx2es uses Rust library [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs), so it runs much faster than traditional software.
 
-```
-Note:
-  2020.06.12
-
-  I've published to PyPI!
-  https://pypi.org/project/evtx2es/
-```
 
 ## Usage
+
+When using from the commandline interface:
 
 ```bash
 $ evtx2es /path/to/your/file.evtx
 ```
 
-or
+When using from the python-script:
 
 ```python
 from evtx2es import evtx2es
@@ -33,15 +31,15 @@ if __name__ == '__main__':
   evtx2es(filepath)
 ```
 
-### Args
+### Arguments
 
-evtx2es supports multiple file input, all arguments are determined as file paths.
+evtx2es supports importing from multiple files.
 
 ```bash
 $ evtx2es file1.evtx file2.evtx file3.evtx
 ```
 
-or
+Also, possible to import recursively from a specific directory.
 
 ```bash
 $ tree .
@@ -70,30 +68,65 @@ $ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
   (default: 9200)
 
 --index:
-  Index name
+  Index name of Import destination
   (default: evtx2es)
 
 --size:
-  bulk insert size
+  Number of grouped documents during bulk insertion (Normally, It doesn't need to change this option.)
   (default: 500)
 
 --scheme:
   Scheme to use (http, or https)
   (default: http)
+
+--pipeline
+  Elasticsearch Ingest Pipeline to use
+  (default: )
+
+--datasetdate
+  Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS
+  (default: 0)
+
+--login:
+  The login to use if Elastic Security is enable
+  (default: )
+
+--pwd:
+  The password linked to the login provided
+  (default: )
 ```
 
 ### Examples
 
+When using from the commandline interface:
+
 ```
-$ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foo --size=500
+$ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foobar --size=500
 ```
+
+When using from the python-script:
 
 ```py
 if __name__ == '__main__':
-    evtx2es('/path/to/your/file.evtx', host=localhost, port=9200, index='foo', size=500)
+    evtx2es('/path/to/your/file.evtx', host=localhost, port=9200, index='foobar', size=500)
 ```
 
-## Extra
+With the Amazon Elasticsearch Serivce (ES):
+
+```
+$ evtx2es /path/to/your/file.evtx --host=example.us-east-1.es.amazonaws.com --port=443 --scheme=https --index=foobar
+```
+
+With credentials for Elastic Security:
+
+```
+$ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foobar --login=elastic --pwd=******
+```
+
+Note: The current version does not verify the certificate.
+
+
+## Appendix
 
 ### Evtx2json
 
@@ -105,7 +138,7 @@ Convert from Windows Eventlog to json file.
 $ evtx2json /path/to/your/file.evtx /path/to/output/target.json
 ```
 
-or
+Convert from Windows Eventlog to Python List[dict] object.
 
 ```python
 from evtx2es import evtx2json
@@ -115,7 +148,7 @@ if __name__ == '__main__':
   result: List[dict] = evtx2json(filepath)
 ```
 
-## Output Format
+## Output Format Example
 
 Using the sample evtx file of [JPCERT/CC:LogonTracer](https://github.com/JPCERTCC/LogonTracer) as an example.
 
@@ -201,14 +234,40 @@ https://hub.docker.com/_/elasticsearch
 
 ## Installation
 
-### via pip
-
+### via PyPI
 ```
 $ pip install evtx2es
 ```
 
-The source code for evtx2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/evtx2es).
+### via DockerHub
+```
+$ docker pull sumeshi/evtx2es:latest
+```
 
+## Run with Docker
+https://hub.docker.com/r/sumeshi/evtx2es
+
+
+## evtx2es
+```bash
+# "host.docker.internal" is only available in mac and windows environments.
+# For linux, use the --add-host option.
+$ docker run -t --rm -v $(pwd):/app/work sumeshi/evtx2es:latest evtx2es /app/work/Security.evtx --host=host.docker.internal
+```
+
+## evtx2json
+```bash
+$ docker run -t --rm -v $(pwd):/app/work sumeshi/evtx2es:latest evtx2es /app/work/Security.evtx /app/work/out.json
+```
+
+Do not use the "latest" image if at all possible.  
+The "latest" image is not a released version, but is built from the contents of the master branch.
+
+## Contributing
+
+[CONTRIBUTING](https://github.com/sumeshi/evtx2es/blob/master/CONTRIBUTING.md)
+
+The source code for evtx2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/evtx2es).
 Please report issues and feature requests. :sushi: :sushi: :sushi:
 
 ## License
