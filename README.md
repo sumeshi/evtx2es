@@ -59,6 +59,22 @@ $ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
 ### Options
 
 ```
+--version, -v
+
+--help, -h
+
+--quiet, -q
+  Flag to suppress standard output
+  (default: False)
+
+--multiprocess, -m:
+  Flag to run multiprocessing (fast!)
+  (default: False)
+
+--size:
+  Size of the chunk to be processed for each process
+  (default: 500)
+
 --host:
   ElasticSearch host address
   (default: localhost)
@@ -70,10 +86,6 @@ $ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
 --index:
   Index name of Import destination
   (default: evtx2es)
-
---size:
-  Number of grouped documents during bulk insertion (Normally, It doesn't need to change this option.)
-  (default: 500)
 
 --scheme:
   Scheme to use (http, or https)
