@@ -33,7 +33,6 @@ class Evtx2jsonPresenter(object):
         generator = r.gen_records(self.shift, self.multiprocess, self.chunk_size) if self.is_quiet else tqdm(r.gen_records(self.shift, self.multiprocess, self.chunk_size))
 
         buffer: List[dict] = list(chain.from_iterable(generator))
-        print(len(buffer))
         return buffer
 
     def export_json(self):
