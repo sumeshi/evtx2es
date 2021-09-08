@@ -37,7 +37,7 @@ jobs:
         run: poetry install --no-interaction
       
       - name: Get Sample File
-        run: wget --quiet https://github.com/JPCERTCC/LogonTracer/blob/master/sample/Security.evtx?raw=true
+        run: wget --quiet https://github.com/JPCERTCC/LogonTracer/blob/master/sample/Security.evtx
 
       - name: Run Tests
         run: poetry run pytest
