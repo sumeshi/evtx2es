@@ -1,0 +1,40 @@
+name: test_e2e
+
+on:
+  push:
+    branches:
+      # - master
+      - develop
+
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  pytest:
+    name: Run tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # python-version: [3.7, 3.8, 3.9]
+        python-version: [3.7]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
+
+      - name: Add path for Poetry
+        run: echo "$HOME/.poetry/bin" >> $GITHUB_PATH
+
+      - name: Install Dependencies
+        run: poetry install --no-interaction
+
+      - name: Run Tests
+        run: poetry run pytest
