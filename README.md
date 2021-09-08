@@ -4,6 +4,7 @@
 [![PyPI version](https://badge.fury.io/py/evtx2es.svg)](https://badge.fury.io/py/evtx2es)
 [![Python Versions](https://img.shields.io/pypi/pyversions/evtx2es.svg)](https://pypi.org/project/evtx2es/)
 [![DockerHub Status](https://shields.io/docker/cloud/build/sumeshi/evtx2es)](https://hub.docker.com/r/sumeshi/evtx2es)
+![e2e test](https://github.com/sumeshi/evtx2es/actions/workflows/test.yml/badge.svg)
 
 ![evtx2es logo](https://gist.githubusercontent.com/sumeshi/c2f430d352ae763273faadf9616a29e5/raw/1bf24feb55571bf7f0c7d8d4cb04bd0a511120f2/evtx2es.svg)
 
