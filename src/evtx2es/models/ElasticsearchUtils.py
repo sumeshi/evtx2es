@@ -11,9 +11,9 @@ import orjson
 class ElasticsearchUtils(object):
     def __init__(self, hostname: str, port: int, scheme: str, login: str, pwd: str) -> None:
         if login == "":
-            self.es = Elasticsearch(host=hostname, port=port, scheme=scheme, verify_certs=False)
+            self.es = Elasticsearch(hosts=[f"{scheme}://{hostname}:{port}"], verify_certs=False)
         else:
-            self.es = Elasticsearch(host=hostname, port=port, scheme=scheme, verify_certs=False, http_auth=(login, pwd))
+            self.es = Elasticsearch(hosts=[f"{scheme}://{hostname}:{port}"], verify_certs=False, http_auth=(login, pwd))
 
     def calc_hash(self, record: dict) -> str:
         """Calculate hash value from record.
