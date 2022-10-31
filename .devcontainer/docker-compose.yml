@@ -1,4 +1,8 @@
 version: '3.8'
+
+# When accessing elasticsearch from devcontainer, execute the following command.
+# $ poetry run evtx2es --host host.docker.internal /path/to/eventlog.evtx
+
 services:
   elasticsearch:
     image: elasticsearch:8.4.3
