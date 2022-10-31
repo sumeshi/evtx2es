@@ -2,7 +2,7 @@ name: publish to pipy
 
 on:
   release:
-    types: [created, published, edited, released]
+    types: [created]
 
 jobs:
   deploy:
