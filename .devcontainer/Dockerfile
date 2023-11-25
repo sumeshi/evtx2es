@@ -9,5 +9,3 @@ RUN apt -y update && apt upgrade -qqy && apt -y install \
 
 RUN chsh -s /usr/bin/fish
 RUN pip install -U pip && pip install poetry
-
-WORKDIR /workspace

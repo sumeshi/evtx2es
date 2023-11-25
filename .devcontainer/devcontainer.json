@@ -1,6 +1,6 @@
 {
     "name": "dev",
-    "dockerComposeFile": "../.devcontainer/docker-compose.yaml",
+    "dockerComposeFile": "docker-compose.yaml",
 	"service": "dev",
 	"workspaceFolder": "/workspace/",
     "postCreateCommand": "/usr/bin/fish ./.devcontainer/postCreateCommands.fish",
