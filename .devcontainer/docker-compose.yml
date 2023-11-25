@@ -3,10 +3,10 @@ version: '3.8'
 services:
   dev:
     build:
-      context: ../
+      context: .
       dockerfile: .devcontainer/Dockerfile
     volumes:
-      - ..:/workspace:cached
+      - .:/workspace:cached
     tty: true
 
   elasticsearch:
