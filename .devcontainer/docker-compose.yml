@@ -1,14 +1,19 @@
 version: '3.8'
 
-# When accessing elasticsearch from devcontainer, execute the following command.
-# $ poetry run evtx2es --host host.docker.internal /path/to/eventlog.evtx
-
 services:
+  dev:
+    build:
+      context: ../
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspace:cached
+    tty: true
+
   elasticsearch:
-    image: elasticsearch:8.4.3
+    image: elasticsearch:8.11.1
     container_name: evtx2es-elasticsearch
     ports:
-        - 9200:9200
+        - "9200:9200"
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -17,10 +22,10 @@ services:
         soft: -1
         hard: -1
 
-  kibana:
-    image: kibana:8.4.3
-    container_name: evtx2es-kibana
-    ports:
-        - 5601:5601
-    environment:
-      - elasticsearch.host="http://localhost:9200"
+  # kibana:
+  #   image: kibana:8.11.1
+  #   container_name: evtx2es-kibana
+  #   ports:
+  #       - 5601:5601
+  #   environment:
+  #     - elasticsearch.host="http://localhost:9200"

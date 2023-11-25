@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "evtx2es"
-version = "1.5.5"
+version = "1.6.0"
 description = "Fast import of Windows EventLogs(.evtx) into Elasticsearch."
 authors = ["sumeshi <sum3sh1@protonmail.com>"]
 license = "MIT"
