@@ -1,0 +1,139 @@
+name: publish-release
+
+on:
+  push:
+    branches:
+      # - master
+      - 'feature/**'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.create_tag.outputs.version }}
+    strategy:
+      matrix:
+        python-version: ['3.11']
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: install python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: replace version
+        run: |
+          from pathlib import Path
+          version = [l for l in Path('pyproject.toml').read_text().splitlines() if 'version' in l][0].split(' ')[-1].strip('\"')
+          f = Path('src/evtx2es/views/BaseView.py')
+          text = f.read_text().replace("get_version('evtx2es')", f"\'{version}\'")
+          f.write_text(text)
+        shell: python
+
+      - name: Install dependencies
+        run: |
+          pip install poetry
+          poetry config virtualenvs.in-project true
+          poetry install
+
+      - name: run python
+        run: |
+          poetry run evtx2es -h
+          poetry run evtx2es -v
+          poetry run evtx2json -h
+          poetry run evtx2json -v
+      
+      - name: build
+        run: |
+          pip install nuitka
+          poetry run python -m nuitka --standalone --onefile --follow-imports -o evtx2es.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
+          poetry run python -m nuitka --standalone --onefile --follow-imports -o evtx2json.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
+      
+      - name: verify
+        run: |
+          dist/evtx2es.exe -h
+          dist/evtx2es.exe -v
+          dist/evtx2json.exe -h
+          dist/evtx2json.exe -v
+      
+      - name: create tag
+        id: create_tag
+        if: startsWith(github.ref, 'refs/heads/master')
+        run: |
+          version=$(cat pyproject.toml | grep version | head -1 | awk -F '"' '{print $2}')
+          git tag "v$version"
+          git push origin "v$version"
+          echo "version=v$version" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+
+      # - name: create release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     tag_name: ${{ steps.create_tag.outputs.version }}
+      #     files: dist/evtx2es.exe
+      #     name: Release ${{ steps.create_tag.outputs.version }}
+      #     body: 'This release was automatically created by GitHub Actions.'
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    needs: build-windows
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        python-version: ['3.11']
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: install python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: replace version
+        run: |
+          from pathlib import Path
+          version = [l for l in Path('pyproject.toml').read_text().splitlines() if 'version' in l][0].split(' ')[-1].strip('\"')
+          f = Path('src/evtx2es/views/BaseView.py')
+          text = f.read_text().replace("get_version('evtx2es')", f"\'{version}\'")
+          f.write_text(text)
+        shell: python
+
+      - name: Install dependencies
+        run: |
+          sudo apt install patchelf
+          pip install poetry
+          poetry install
+
+      - name: run python
+        run: |
+          poetry run evtx2es -h
+          poetry run evtx2es -v
+          poetry run evtx2json -h
+          poetry run evtx2json -v
+
+      - name: build
+        run: |
+          pip install nuitka
+          poetry run python -m nuitka --standalone --onefile --follow-imports -o evtx2es --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
+          poetry run python -m nuitka --standalone --onefile --follow-imports -o evtx2json --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
+      
+      - name: verify
+        run: |
+          dist/evtx2es -h
+          dist/evtx2es -v
+          dist/evtx2json -h
+          dist/evtx2json -v
+
+      # - name: upload asset to release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     tag_name: ${{ needs.build-windows.outputs.version }}
+      #     files: dist/evtx2es
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
