@@ -3,8 +3,7 @@ name: publish-release
 on:
   push:
     branches:
-      # - master
-      - 'feature/**'
+      - master
 
 jobs:
   build-windows:
@@ -70,15 +69,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
 
-      # - name: create release
-      #   uses: softprops/action-gh-release@v1
-      #   with:
-      #     tag_name: ${{ steps.create_tag.outputs.version }}
-      #     files: dist/evtx2es.exe
-      #     name: Release ${{ steps.create_tag.outputs.version }}
-      #     body: 'This release was automatically created by GitHub Actions.'
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.create_tag.outputs.version }}
+          files: |
+            dist/evtx2es.exe
+            dist/evtx2json.exe
+          name: Release ${{ steps.create_tag.outputs.version }}
+          body: 'This release was automatically created by GitHub Actions.'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-linux:
     needs: build-windows
@@ -130,10 +131,12 @@ jobs:
           dist/evtx2json -h
           dist/evtx2json -v
 
-      # - name: upload asset to release
-      #   uses: softprops/action-gh-release@v1
-      #   with:
-      #     tag_name: ${{ needs.build-windows.outputs.version }}
-      #     files: dist/evtx2es
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: upload asset to release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.build-windows.outputs.version }}
+          files: |
+            dist/evtx2es
+            dist/evtx2json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
