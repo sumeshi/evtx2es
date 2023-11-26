@@ -3,25 +3,22 @@
 [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
 [![PyPI version](https://badge.fury.io/py/evtx2es.svg)](https://badge.fury.io/py/evtx2es)
 [![Python Versions](https://img.shields.io/pypi/pyversions/evtx2es.svg)](https://pypi.org/project/evtx2es/)
-[![e2e test](https://github.com/sumeshi/evtx2es/actions/workflows/test.yml/badge.svg)](https://github.com/sumeshi/evtx2es/actions/workflows/test.yml)
+[![pytest](https://github.com/sumeshi/evtx2es/actions/workflows/test.yml/badge.svg)](https://github.com/sumeshi/evtx2es/actions/workflows/test.yml)
 
 ![evtx2es logo](https://gist.githubusercontent.com/sumeshi/c2f430d352ae763273faadf9616a29e5/raw/1bf24feb55571bf7f0c7d8d4cb04bd0a511120f2/evtx2es.svg)
 
 Fast import of Windows EventLogs(.evtx) into Elasticsearch.
 
 Life is too short and there is not enough time to process **huge Windows EventLogs** with **pure-Python software**.  
-evtx2es uses Rust library [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs), so it runs much faster than traditional software.
-
+**evtx2es** uses Rust library [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs), so it runs much faster than traditional software.
 
 ## Usage
 
-When using from the commandline interface:
+**evtx2es** can be executed from the command line or incorporated into a Python script.
 
 ```bash
 $ evtx2es /path/to/your/file.evtx
 ```
-
-When using from the python-script:
 
 ```python
 from evtx2es import evtx2es
@@ -33,13 +30,13 @@ if __name__ == '__main__':
 
 ### Arguments
 
-evtx2es supports importing from multiple files.
+evtx2es supports simultaneous import of multiple files.
 
 ```bash
 $ evtx2es file1.evtx file2.evtx file3.evtx
 ```
 
-Also, possible to import recursively from a specific directory.
+Additionally, it also allows for recursive import under the specified directory.
 
 ```bash
 $ tree .
@@ -68,44 +65,35 @@ $ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
   (default: False)
 
 --multiprocess, -m:
-  Flag to run multiprocessing (fast!)
+  Enable multiprocessing for faster execution
   (default: False)
 
 --size:
-  Size of the chunk to be processed for each process
-  (default: 500)
+  Chunk size for processing (default: 500)
 
 --host:
-  ElasticSearch host address
-  (default: localhost)
+  ElasticSearch host address (default: localhost)
 
 --port:
-  ElasticSearch port number
-  (default: 9200)
+  ElasticSearch port number (default: 9200)
 
 --index:
-  Index name of Import destination
-  (default: evtx2es)
+  Destination index name for importing (default: evtx2es)
 
 --scheme:
-  Scheme to use (http, or https)
-  (default: http)
+  Protocol scheme to use (http or https) (default: http)
 
---pipeline
-  Elasticsearch Ingest Pipeline to use
-  (default: )
+--pipeline:
+  Elasticsearch Ingest Pipeline to use (default: )
 
---datasetdate
-  Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS
-  (default: 0)
+--datasetdate:
+  Date of the latest record in the dataset, extracted from TimeCreated field (MM/DD/YYYY.HH:MM:SS) (default: 0)
 
 --login:
-  The login to use if Elastic Security is enable
-  (default: )
+  The login to use if Elastic Security is enabled (default: )
 
 --pwd:
-  The password linked to the login provided
-  (default: )
+  The password associated with the provided login (default: )
 ```
 
 ### Examples
@@ -123,12 +111,6 @@ if __name__ == '__main__':
     evtx2es('/path/to/your/file.evtx', host=localhost, port=9200, index='foobar', size=500)
 ```
 
-With the Amazon Elasticsearch Serivce (ES):
-
-```
-$ evtx2es /path/to/your/file.evtx --host=example.us-east-1.es.amazonaws.com --port=443 --scheme=https --index=foobar
-```
-
 With credentials for Elastic Security:
 
 ```
@@ -142,15 +124,15 @@ Note: The current version does not verify the certificate.
 
 ### Evtx2json
 
-Extra feature. :sushi: :sushi: :sushi:
+An additional feature: :sushi: :sushi: :sushi:
 
-Convert from Windows Eventlog to json file.
+Convert Windows Event Logs to a JSON file.
 
 ```bash
 $ evtx2json /path/to/your/file.evtx /path/to/output/target.json
 ```
 
-Convert from Windows Eventlog to Python List[dict] object.
+Convert Windows Event Logs to a Python List[dict] object.
 
 ```python
 from evtx2es import evtx2json
@@ -246,38 +228,26 @@ https://hub.docker.com/_/elasticsearch
 
 ## Installation
 
-### via PyPI
+### from PyPI
+
 ```
 $ pip install evtx2es
 ```
 
-### via DockerHub
-```
-$ docker pull sumeshi/evtx2es:latest
-```
+### from GitHub Releases
 
-## Run with Docker
-https://hub.docker.com/r/sumeshi/evtx2es
+The version compiled into a binary using Nuitka is also available for use.
 
-
-## evtx2es
 ```bash
-# "host.docker.internal" is only available in mac and windows environments.
-# For linux, use the --add-host option.
-$ docker run -t --rm -v $(pwd):/app/work sumeshi/evtx2es:latest evtx2es /app/work/Security.evtx --host=host.docker.internal
+$ chmod +x ./ntfsdump
+$ ./ntfsdump {{options...}}
 ```
 
-## evtx2json
-```bash
-$ docker run -t --rm -v $(pwd):/app/work sumeshi/evtx2es:latest evtx2es /app/work/Security.evtx /app/work/out.json
+```powershell
+> ntfsdump.exe {{options...}}
 ```
-
-Do not use the "latest" image if at all possible.  
-The "latest" image is not a released version, but is built from the contents of the master branch.
 
 ## Contributing
-
-[CONTRIBUTING](https://github.com/sumeshi/evtx2es/blob/master/CONTRIBUTING.md)
 
 The source code for evtx2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/evtx2es).
 Please report issues and feature requests. :sushi: :sushi: :sushi:
@@ -286,5 +256,8 @@ Please report issues and feature requests. :sushi: :sushi: :sushi:
 
 evtx2es is released under the [MIT](https://github.com/sumeshi/evtx2es/blob/master/LICENSE) License.
 
-Powered by [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs).  
+Powered by following libraries:
+- [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs)
+- [Nuitka](https://github.com/Nuitka/Nuitka)
+
 Inspired by [EvtxtoElk](https://github.com/dgunter/evtxtoelk).

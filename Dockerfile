@@ -1,5 +1,5 @@
 # --- build stage ---
-FROM python:3.9-bullseye AS builder
+FROM python:3.11-bullseye AS builder
 
 # configure poetry
 RUN pip install poetry
@@ -13,7 +13,7 @@ RUN poetry build
 
 
 # --- execute stage ---
-FROM python:3.9-bullseye AS app
+FROM python:3.11-bullseye AS app
 WORKDIR /app
 COPY --from=builder /app/dist/ /opt
 RUN pip install --find-links=/opt evtx2es
