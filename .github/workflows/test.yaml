@@ -30,9 +30,6 @@ jobs:
 
       - name: Install Dependencies
         run: poetry install --no-interaction
-      
-      - name: Get Sample File
-        run: wget --quiet https://github.com/JPCERTCC/LogonTracer/raw/master/sample/Security.evtx
 
       - name: Run Tests
         run: poetry run pytest
