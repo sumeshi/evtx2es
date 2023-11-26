@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspace:cached
+    network_mode: service:elasticsearch
+    tty: true
+
+  elasticsearch:
+    image: elasticsearch:8.11.1
+    container_name: evtx2es-elasticsearch
+    ports:
+        - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  # kibana:
+  #   image: kibana:8.11.1
+  #   container_name: evtx2es-kibana
+  #   ports:
+  #       - 5601:5601
+  #   environment:
+  #     - elasticsearch.host="http://localhost:9200"

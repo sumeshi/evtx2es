@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "evtx2es"
-version = "1.5.3"
+version = "1.6.0"
 description = "Fast import of Windows EventLogs(.evtx) into Elasticsearch."
 authors = ["sumeshi <sum3sh1@protonmail.com>"]
 license = "MIT"
@@ -16,19 +16,19 @@ evtx2es = 'evtx2es.views.Evtx2esView:entry_point'
 evtx2json = 'evtx2es.views.Evtx2jsonView:entry_point'
 
 [tool.poetry.dependencies]
-python = "^3.9"
-elasticsearch = "^8.4.3"
-evtx = "^0.8.1"
-tqdm = "^4.64.1"
-urllib3 = "^1.26.12"
-orjson = "^3.8.1"
-importlib-metadata = "^5.0.0"
+python = "^3.11"
+elasticsearch = "^8.11.0"
+evtx = "^0.8.3"
+tqdm = "^4.66.1"
+urllib3 = "^2.1.0"
+orjson = "^3.9.10"
 
 [tool.poetry.group.dev.dependencies]
-mypy = "^0.982"
-flake8 = "^5.0.4"
-black = "^22.10.0"
-pytest = "^7.2.0"
+mypy = "^1.7.1"
+flake8 = "^6.1.0"
+black = "^23.11.0"
+pytest = "^7.4.3"
+nuitka = "1.7.10"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
