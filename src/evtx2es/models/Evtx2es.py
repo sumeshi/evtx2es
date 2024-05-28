@@ -83,13 +83,9 @@ def format_record(record: dict, filepath: str, shift: Union[str, datetime]):
         pass
 
     try:
-        record["userdata"] = {
-            "address": record["data"]["Event"]["UserData"]["EventXML"]["Address"],
-            "sessionid": record["data"]["Event"]["UserData"]["EventXML"][
-                "SessionID"
-            ],
-            "user": record["data"]["Event"]["UserData"]["EventXML"]["User"],
-        }
+        record["userdata"] = record["data"]["Event"].get(
+            "UserData", dict()
+        )
     except KeyError:
         pass
 
