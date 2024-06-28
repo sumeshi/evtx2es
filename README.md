@@ -239,12 +239,12 @@ $ pip install evtx2es
 The version compiled into a binary using Nuitka is also available for use.
 
 ```bash
-$ chmod +x ./ntfsdump
-$ ./ntfsdump {{options...}}
+$ chmod +x ./evtx2es
+$ ./evtx2es {{options...}}
 ```
 
 ```powershell
-> ntfsdump.exe {{options...}}
+> evtx2es.exe {{options...}}
 ```
 
 ## Contributing
