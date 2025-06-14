@@ -258,6 +258,12 @@ $ ./evtx2es {{options...}}
 The source code for evtx2es is hosted on GitHub. You can download, fork, and review it from this repository: https://github.com/sumeshi/evtx2es.
 Please report issues and feature requests. :sushi: :sushi: :sushi:
 
+## Included in
+
+- [Tsurugi Linux [Lab] 2022 - 2024](https://tsurugi-linux.org/) - DFIR Linux distribution
+
+Thank you for your interest in evtx2es!
+
 ## License
 
 evtx2es is released under the [MIT](https://github.com/sumeshi/evtx2es/blob/master/LICENSE) License.
