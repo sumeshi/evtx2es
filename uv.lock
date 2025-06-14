@@ -148,7 +148,7 @@ wheels = [
 
 [[package]]
 name = "evtx2es"
-version = "1.7.0"
+version = "1.7.6"
 source = { editable = "." }
 dependencies = [
     { name = "elasticsearch" },
@@ -181,7 +181,7 @@ dev = [
     { name = "black", specifier = ">=25.1.0" },
     { name = "flake8", specifier = ">=7.2.0" },
     { name = "mypy", specifier = ">=1.16.0" },
-    { name = "nuitka", specifier = ">=2.7.7" },
+    { name = "nuitka", specifier = "==1.7.10" },
     { name = "pytest", specifier = ">=8.4.0" },
 ]
 
@@ -260,13 +260,13 @@ wheels = [
 
 [[package]]
 name = "nuitka"
-version = "2.7.7"
+version = "1.7.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ordered-set" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0a/3f/3294699ad8ebca820127b5606c77e52bb1bd5d7eea97e9dd5a6228884e80/Nuitka-2.7.7.tar.gz", hash = "sha256:327e697e1a3eea2608ca7dce228c2d7686d65e38af9907c98646695ba5df9edf", size = 3886105, upload-time = "2025-06-10T08:03:01.489Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f7/7a/0ee84fdd60f15d17cf3ce7fb69df8301b71c9418eef7e0702c3a8a072b6f/Nuitka-1.7.10.tar.gz", hash = "sha256:61c84b4eb7105d20836940ab6134460b690da8aab7a74bdc84ddd05de1e04b16", size = 4289025, upload-time = "2023-08-14T11:00:15.903Z" }
 
 [[package]]
 name = "ordered-set"
