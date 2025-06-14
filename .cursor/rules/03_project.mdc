@@ -1,0 +1,92 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: Project-specific rules for evtx2es
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# evtx2es - Project Specific Rules
+
+## Project Overview
+evtx2es is a Python tool for fast import of Windows EventLogs (.evtx) into Elasticsearch using Rust library pyevtx-rs for high performance.
+
+## Technology Stack
+- **Language**: Python 3.8+
+- **Core Dependencies**: 
+  - pyevtx-rs (Rust-based EVTX parser)
+  - elasticsearch (Elasticsearch client)
+  - Click (CLI framework)
+- **Package Manager**: pip/poetry
+- **Development Tools**: pytest, black, mypy
+
+## Project Structure
+```
+evtx2es/
+├── src/evtx2es/          # Main package
+├── tests/                # Test files
+├── docs/                 # Documentation
+├── examples/             # Usage examples
+├── requirements.txt      # Production dependencies
+├── requirements-dev.txt  # Development dependencies
+└── README.md            # Project documentation
+```
+
+## Domain-Specific Requirements
+
+### Performance Considerations
+- Optimize for large EVTX file processing
+- Use streaming/chunked processing for memory efficiency
+- Leverage Rust-based pyevtx-rs for maximum performance
+- Implement progress reporting for long-running operations
+
+### Elasticsearch Integration
+- Support multiple Elasticsearch versions
+- Implement proper index mapping for Windows Event Log fields
+- Handle connection errors and retries gracefully
+- Support bulk indexing for performance
+
+### CLI Design
+- Use Click for consistent command-line interface
+- Provide clear progress indicators
+- Support configuration files
+- Implement proper error messages and help text
+
+### Windows Event Log Specifics
+- Handle various EVTX file formats correctly
+- Preserve all relevant event metadata
+- Support filtering and transformation of events
+- Handle malformed or corrupted EVTX files gracefully
+
+### Data Processing
+- Implement proper JSON serialization for Elasticsearch
+- Handle timestamp conversion and formatting
+- Support custom field mapping and transformation
+- Ensure data integrity during processing
+
+## Development Workflow
+- Focus on CLI usability and performance
+- Test with real EVTX files of various sizes
+- Benchmark performance improvements
+- Document configuration options thoroughly
+
+---
+
+## AI Assistant Instructions
+
+### Project Context Awareness
+- Always consider the Windows Event Log processing context
+- Understand the performance-critical nature of the tool
+- Be aware of Elasticsearch indexing requirements
+- Consider CLI user experience in suggestions
+
+### Enhancement Suggestions
+- When suggesting improvements, consider:
+  - Performance impact on large file processing
+  - Elasticsearch compatibility
+  - CLI usability
+  - Memory efficiency
+- Always test suggestions with the project's core functionality in mind 

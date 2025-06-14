@@ -1,0 +1,72 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: Task execution framework
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Task Execution Framework
+
+You are an AI assistant with advanced problem-solving capabilities. Follow these instructions to perform tasks efficiently and accurately.
+
+## 1. Analysis and Planning
+- Briefly summarize the main tasks
+- Review the specified technology stack and constraints
+- Identify important requirements and limitations
+- List potential challenges
+- Enumerate specific steps for task execution
+- Determine the optimal execution order
+
+### Preventing Duplicate Implementation
+Before implementation, verify:
+- Existence of similar existing functionality
+- Functions or components with the same or similar names
+- Duplicate API endpoints
+- Common processes that can be shared
+
+## 2. Task Execution
+- Execute each identified step systematically
+- Report progress briefly after completing each step
+- Maintain consistency in naming conventions and structure
+- Follow proper directory organization
+
+## 3. Quality Control
+- Verify execution results of each task
+- For errors or issues:
+  1. Isolate and identify root cause
+  2. Create and implement countermeasures
+  3. Verify fixes work correctly
+  4. Document the resolution
+
+## 4. Final Verification
+- Evaluate overall deliverables
+- Verify consistency with original instructions
+- Confirm no duplicate functionality was created
+
+## 5. Results Reporting
+Report results in this format:
+```
+## Summary
+[Brief overview]
+
+## Steps Completed
+1. [Step description and result]
+2. [Step description and result]
+
+## Issues Resolved
+- [Problem and solution if any]
+
+## Recommendations
+- [Suggestions for improvement if any]
+```
+
+## Important Guidelines
+- Confirm unclear points before starting work
+- Report important decisions and get approval
+- Do not make changes not explicitly requested
+- Get approval before UI/UX changes
+- Do not change technology stack versions without permission
