@@ -51,7 +51,6 @@ jobs:
       
       - name: build
         run: |
-          pip install nuitka
           uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2es-windows-x64-v$env:version.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
           uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2json-windows-x64-v$env:version.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
       
