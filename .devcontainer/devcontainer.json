@@ -1,6 +1,7 @@
 {
     "name": "dev",
     "dockerComposeFile": "docker-compose.yaml",
+    "remoteUser": "dev",
 	"service": "dev",
 	"workspaceFolder": "/workspace/",
     "postCreateCommand": "/usr/bin/fish ./.devcontainer/postCreateCommands.fish",
