@@ -35,6 +35,13 @@ jobs:
         run: |
           pip install uv
 
+      - name: get version
+        id: get_version
+        run: |
+          version=$(cat pyproject.toml | grep version | head -1 | awk -F '"' '{print $2}')
+          echo "version=$version" >> $GITHUB_ENV
+        shell: bash
+
       - name: run python
         run: |
           uv run evtx2es -h
@@ -45,15 +52,15 @@ jobs:
       - name: build
         run: |
           pip install nuitka
-          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2es.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
-          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2json.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2es-windows-x64-v$version.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2json-windows-x64-v$version.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
       
       - name: verify
         run: |
-          dist/evtx2es.exe -h
-          dist/evtx2es.exe -v
-          dist/evtx2json.exe -h
-          dist/evtx2json.exe -v
+          dist/evtx2es-windows-x64-v$version.exe -h
+          dist/evtx2es-windows-x64-v$version.exe -v
+          dist/evtx2json-windows-x64-v$version.exe -h
+          dist/evtx2json-windows-x64-v$version.exe -v
       
       - name: create tag
         id: create_tag
@@ -62,7 +69,7 @@ jobs:
           version=$(cat pyproject.toml | grep version | head -1 | awk -F '"' '{print $2}')
           git tag "v$version"
           git push origin "v$version"
-          echo "version=v$version" >> $GITHUB_OUTPUT
+          echo "version=$version" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -70,11 +77,11 @@ jobs:
       - name: create release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.create_tag.outputs.version }}
+          tag_name: v${{ steps.create_tag.outputs.version }}
           files: |
-            dist/evtx2es.exe
-            dist/evtx2json.exe
-          name: Release ${{ steps.create_tag.outputs.version }}
+            dist/evtx2es-windows-x64-v${{ env.version }}.exe
+            dist/evtx2json-windows-x64-v${{ env.version }}.exe
+          name: Release v${{ steps.create_tag.outputs.version }}
           body: 'This release was automatically created by GitHub Actions.'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -85,6 +92,8 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.11']
+    env:
+      version: ${{ needs.build-windows.outputs.version }}
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -118,22 +127,22 @@ jobs:
       - name: build
         run: |
           pip install nuitka
-          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2es --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
-          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2json --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2es-linux-x64-v$version --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2json-linux-x64-v$version --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
       
       - name: verify
         run: |
-          dist/evtx2es -h
-          dist/evtx2es -v
-          dist/evtx2json -h
-          dist/evtx2json -v
+          dist/evtx2es-linux-x64-v$version -h
+          dist/evtx2es-linux-x64-v$version -v
+          dist/evtx2json-linux-x64-v$version -h
+          dist/evtx2json-linux-x64-v$version -v
 
       - name: upload asset to release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ needs.build-windows.outputs.version }}
+          tag_name: v${{ needs.build-windows.outputs.version }}
           files: |
-            dist/evtx2es
-            dist/evtx2json
+            dist/evtx2es-linux-x64-v${{ env.version }}
+            dist/evtx2json-linux-x64-v${{ env.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
