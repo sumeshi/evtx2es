@@ -57,10 +57,11 @@ jobs:
       
       - name: verify
         run: |
-          dist\evtx2es-windows-x64-v$env:version.exe -h
-          dist\evtx2es-windows-x64-v$env:version.exe -v
-          dist\evtx2json-windows-x64-v$env:version.exe -h
-          dist\evtx2json-windows-x64-v$env:version.exe -v
+          dist/evtx2es-windows-x64-v$version.exe -h
+          dist/evtx2es-windows-x64-v$version.exe -v
+          dist/evtx2json-windows-x64-v$version.exe -h
+          dist/evtx2json-windows-x64-v$version.exe -v
+        shell: bash
       
       - name: create tag
         id: create_tag
@@ -88,7 +89,7 @@ jobs:
 
   build-linux:
     needs: build-windows
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         python-version: ['3.11']
