@@ -33,22 +33,20 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install poetry
-          poetry config virtualenvs.in-project true
-          poetry install
+          pip install uv
 
       - name: run python
         run: |
-          poetry run evtx2es -h
-          poetry run evtx2es -v
-          poetry run evtx2json -h
-          poetry run evtx2json -v
+          uv run evtx2es -h
+          uv run evtx2es -v
+          uv run evtx2json -h
+          uv run evtx2json -v
       
       - name: build
         run: |
           pip install nuitka
-          poetry run python -m nuitka --standalone --onefile --follow-imports -o evtx2es.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
-          poetry run python -m nuitka --standalone --onefile --follow-imports -o evtx2json.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2es.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2json.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
       
       - name: verify
         run: |
@@ -108,21 +106,20 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt install patchelf
-          pip install poetry
-          poetry install
+          pip install uv
 
       - name: run python
         run: |
-          poetry run evtx2es -h
-          poetry run evtx2es -v
-          poetry run evtx2json -h
-          poetry run evtx2json -v
+          uv run evtx2es -h
+          uv run evtx2es -v
+          uv run evtx2json -h
+          uv run evtx2json -v
 
       - name: build
         run: |
           pip install nuitka
-          poetry run python -m nuitka --standalone --onefile --follow-imports -o evtx2es --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
-          poetry run python -m nuitka --standalone --onefile --follow-imports -o evtx2json --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2es --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2json --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
       
       - name: verify
         run: |
