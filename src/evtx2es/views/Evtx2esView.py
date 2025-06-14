@@ -50,14 +50,13 @@ class Evtx2esView(BaseView):
         else:
             shift = '0'
 
-        view = Evtx2esView()
         evtx_files = self.__list_evtx_files(self.args.evtx_files)
 
         if self.args.multiprocess:
-            view.log(f"Multi-Process: {cpu_count()}", self.args.quiet)
+            self.log(f"Multi-Process: {cpu_count()}", self.args.quiet)
 
         for evtx_file in evtx_files:
-            view.log(f"Currently Importing {evtx_file}.", self.args.quiet)
+            self.log(f"Currently Importing {evtx_file}.", self.args.quiet)
 
             Evtx2esPresenter(
                 input_path=evtx_file,
@@ -72,9 +71,10 @@ class Evtx2esView(BaseView):
                 is_quiet=self.args.quiet,
                 multiprocess=self.args.multiprocess,
                 chunk_size=int(self.args.size),
+                logger=self.log
             ).bulk_import()
 
-        view.log("Import completed.", self.args.quiet)
+        self.log("Import completed.", self.args.quiet)
 
 
 def entry_point():

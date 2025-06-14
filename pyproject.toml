@@ -1,35 +1,35 @@
-[tool.poetry]
+[project]
 name = "evtx2es"
-version = "1.6.1"
+version = "1.7.0"
 description = "Fast import of Windows EventLogs(.evtx) into Elasticsearch."
-authors = ["sumeshi <sum3sh1@protonmail.com>"]
-license = "MIT"
 readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "sumeshi", email = "sum3sh1@protonmail.com" }
+]
+requires-python = ">=3.13"
 
-repository = "https://github.com/sumeshi/evtx2es"
-homepage = "https://github.com/sumeshi/evtx2es"
-
-keywords = ['evtx', 'elasticsearch', 'json']
-
-[tool.poetry.scripts]
-evtx2es = 'evtx2es.views.Evtx2esView:entry_point'
-evtx2json = 'evtx2es.views.Evtx2jsonView:entry_point'
-
-[tool.poetry.dependencies]
-python = "^3.11"
-elasticsearch = "^8.11.0"
-evtx = "^0.8.3"
-tqdm = "^4.66.1"
-urllib3 = "^2.1.0"
-orjson = "^3.9.10"
-
-[tool.poetry.group.dev.dependencies]
-mypy = "^1.7.1"
-flake8 = "^6.1.0"
-black = "^23.11.0"
-pytest = "^7.4.3"
-nuitka = "1.7.10"
+dependencies = [
+    "elasticsearch>=9.0.2",
+    "evtx>=0.8.9",
+    "orjson>=3.10.18",
+    "tqdm>=4.67.1",
+    "urllib3>=2.4.0",
+]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "flake8>=7.2.0",
+    "mypy>=1.16.0",
+    "nuitka>=2.7.7",
+    "pytest>=8.4.0",
+]
+
+[project.scripts]
+evtx2es = "evtx2es.views.Evtx2esView:entry_point"
+evtx2json = "evtx2es.views.Evtx2jsonView:entry_point"

@@ -1,0 +1,73 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: Python development standards
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Python Standards
+
+## Language & Framework
+- **Language**: Python 3.8+
+- **Package Manager**: pip or uv
+- **Virtual Environment**: Always use virtual environments
+
+## Code Style
+- Follow PEP 8 style guidelines
+- Use type hints for all functions and methods
+- Maximum line length: 88 characters (Black formatter compatible)
+- Use snake_case for variables and functions, PascalCase for classes
+- Use UPPER_CASE for constants
+- Write docstrings for all public functions and classes
+
+## Development Tools
+- **Formatter**: black (recommended) or autopep8
+- **Linter**: flake8, pylint, or ruff
+- **Type Checker**: mypy or pyright
+- **Testing**: pytest or unittest
+- **Import Sorting**: isort
+
+## Code Quality
+- Maintain type safety with type checker
+- Keep functions focused and single-purpose
+- Use descriptive error messages
+- Handle exceptions appropriately
+- Use context managers for resource management
+
+## File Organization
+```
+project/
+├── src/                 # Source code
+├── tests/               # Test files
+├── pyproject.toml       # Project configuration
+└── README.md           # Project documentation
+```
+
+## Dependencies
+- Always specify minimum versions
+- Keep dependencies minimal and well-justified
+- Pin exact versions in lock files
+- Document new dependencies and their purpose
+
+## Error Handling
+- Use appropriate exception types
+- Provide meaningful error messages
+- Log errors appropriately
+- Fail gracefully with helpful suggestions
+
+## Performance
+- Use appropriate data structures
+- Consider memory usage for large data processing
+- Use generators for large datasets
+- Profile code when performance is critical
+
+## Security
+- Never hardcode credentials
+- Validate input parameters
+- Handle sensitive data appropriately
+- Follow security best practices
+

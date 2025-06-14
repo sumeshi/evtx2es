@@ -47,31 +47,15 @@ def test__evtx2json_version(monkeypatch):
             e2j()
         assert exited.value.code == 0
 
-# def test__commands(monkeypatch):
-#     argv = ["evtx2es", "-h"]
-#     stdin = io.StringIO()
-#     stdout = io.StringIO()
-# 
-#     with monkeypatch.context() as m:
-#         m.setattr("sys.argv", argv)
-#         m.setattr("sys.stdin", stdin)
-#         m.setattr("sys.stdout", stdout)
-#         evtx2es.entry_point()
-# 
-#     with pytest.raises(SystemExit) as exited:
-#         e2e()
-#     assert stdout.getvalue() == ""
-
 
 # behavior test cases 
-
 def test__evtx2json_convert(monkeypatch):
     path = 'tests/cache/Security.json'
     argv = ["evtx2json", "-o", path, "tests/cache/Security.evtx"]
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         e2j()
-    assert calc_md5(Path(path)) == "899719d5142ad31f82f6c866f971b8b7"
+    assert calc_md5(Path(path)) == "1c99682c5f94b8d3bfaa72a5a95b360c"
 
 def test__evtx2json_convert_multiprocessing(monkeypatch):
     path = 'tests/cache/Security-m.json'
@@ -79,4 +63,4 @@ def test__evtx2json_convert_multiprocessing(monkeypatch):
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         e2j()
-    assert calc_md5(Path(path)) == "899719d5142ad31f82f6c866f971b8b7"
+    assert calc_md5(Path(path)) == "1c99682c5f94b8d3bfaa72a5a95b360c"

@@ -26,13 +26,16 @@ class ElasticsearchUtils(object):
         """
         return sha1(orjson.dumps(record, option=orjson.OPT_SORT_KEYS)).hexdigest()
 
-    def bulk_indice(self, records: List[dict], index_name: str, pipeline: str) -> None:
+    def bulk_indice(self, records: List[dict], index_name: str, pipeline: str) -> tuple:
         """Bulk indices the documents into Elasticsearch.
 
         Args:
             records (List[dict]): List of each records read from Eventlog files.
             index_name (str): Target Elasticsearch Index.
             pipeline (str): Target Elasticsearch Ingest Pipeline
+            
+        Returns:
+            tuple: (success_count, failed_list) - Results of bulk indexing operation
         """
         events = []
         for record in records:
@@ -40,4 +43,10 @@ class ElasticsearchUtils(object):
             if pipeline != "":
                 event["pipeline"] = pipeline
             events.append(event)
-        bulk(self.es, events, raise_on_error=False)
+        
+        # Perform bulk indexing and return results
+        try:
+            success, failed = bulk(self.es, events, raise_on_error=False, stats_only=False)
+            return (success, failed)
+        except Exception as e:
+            raise Exception(f"Bulk indexing error: {e}") from e

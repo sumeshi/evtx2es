@@ -1,3 +1,2 @@
 #!/usr/bin/fish
-poetry config virtualenvs.in-project true
-poetry install
+echo 'set -x PATH $PATH $HOME/.local/bin' >> $HOME/.config/fish/config.fish
