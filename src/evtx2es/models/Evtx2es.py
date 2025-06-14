@@ -4,10 +4,39 @@ from itertools import chain
 from pathlib import Path
 from typing import List, Generator, Iterable, Union
 from itertools import islice
-from multiprocessing import Pool, cpu_count
+import multiprocessing as mp
+from multiprocessing import cpu_count
+import sys
+import os
 
 import orjson
 from evtx import PyEvtxParser
+
+
+class SafeMultiprocessingMixin:
+    """Safe multiprocessing management class for Python 3.13 compatibility"""
+    
+    @staticmethod
+    def get_multiprocessing_context() -> mp.context:
+        """Get safe multiprocessing context"""
+        # Use spawn for Python 3.13+ or test environments to avoid fork() issues
+        if sys.version_info >= (3, 13) or 'pytest' in sys.modules:
+            try:
+                ctx = mp.get_context('spawn')
+            except RuntimeError:
+                ctx = mp.get_context()
+        else:
+            ctx = mp.get_context()
+        
+        return ctx
+    
+    @staticmethod
+    def get_cpu_count() -> int:
+        """Get CPU count safely"""
+        try:
+            return mp.cpu_count()
+        except NotImplementedError:
+            return os.cpu_count() or 1
 
 
 def generate_chunks(chunk_size: int, iterable: Iterable) -> Generator:
@@ -168,7 +197,7 @@ def process_by_chunk(records: List[str], filepath: Union[Generator, str], shift:
     ]
 
 
-class Evtx2es(object):
+class Evtx2es(SafeMultiprocessingMixin):
     def __init__(self, input_path: Path) -> None:
         self.path = input_path
         self.parser = PyEvtxParser(self.path.open(mode="rb"))
@@ -188,7 +217,9 @@ class Evtx2es(object):
         gen_shift = iter(lambda: shift, None)
 
         if multiprocess:
-            with Pool(cpu_count()) as pool:
+            # Use safe context for Python 3.13 compatibility
+            ctx = self.get_multiprocessing_context()
+            with ctx.Pool(self.get_cpu_count()) as pool:
                 results = pool.starmap_async(
                     process_by_chunk,
                     zip(
