@@ -7,10 +7,10 @@
 
 ![evtx2es logo](https://gist.githubusercontent.com/sumeshi/c2f430d352ae763273faadf9616a29e5/raw/1bf24feb55571bf7f0c7d8d4cb04bd0a511120f2/evtx2es.svg)
 
-Fast import of Windows EventLogs(.evtx) into Elasticsearch.
+A library for fast parse & import of Windows Eventlogs into Elasticsearch.
 
-Life is too short and there is not enough time to process **huge Windows EventLogs** with **pure-Python software**.  
-**evtx2es** uses Rust library [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs), so it runs much faster than traditional software.
+Life is too short to process **huge Windows Eventlogs** with **pure Python**.  
+**evtx2es** uses the Rust library [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs), making it much faster than traditional tools.
 
 ## Usage
 
@@ -36,7 +36,7 @@ evtx2es supports simultaneous import of multiple files.
 $ evtx2es file1.evtx file2.evtx file3.evtx
 ```
 
-Additionally, it also allows for recursive import under the specified directory.
+It also allows recursive import from the specified directory.
 
 ```bash
 $ tree .
@@ -50,7 +50,7 @@ evtxfiles/
       ├── file5.evtx
       └── file6.evtx
 
-$ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
+$ evtx2es /evtxfiles/ # The path is recursively expanded to file1~6.evtx.
 ```
 
 ### Options
@@ -61,7 +61,7 @@ $ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
 --help, -h
 
 --quiet, -q
-  Flag to suppress standard output
+  Suppress standard output
   (default: False)
 
 --multiprocess, -m:
@@ -72,13 +72,13 @@ $ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
   Chunk size for processing (default: 500)
 
 --host:
-  ElasticSearch host address (default: localhost)
+  Elasticsearch host address (default: localhost)
 
 --port:
-  ElasticSearch port number (default: 9200)
+  Elasticsearch port number (default: 9200)
 
 --index:
-  Destination index name for importing (default: evtx2es)
+  Destination index name (default: evtx2es)
 
 --scheme:
   Protocol scheme to use (http or https) (default: http)
@@ -98,13 +98,13 @@ $ evtx2es /evtxfiles/ # The Path is recursively expanded to file1~6.evtx.
 
 ### Examples
 
-When using from the commandline interface:
+When using from the command line:
 
 ```
 $ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foobar --size=500
 ```
 
-When using from the python-script:
+When using from a Python script:
 
 ```py
 if __name__ == '__main__':
@@ -223,7 +223,7 @@ CPU: Intel Core i5-6500
 RAM: DDR4 32GB
 ```
 
-ElasticSearch 7.4 was running on the Docker version(Official Image).  
+Elasticsearch 7.4 was running on Docker (Official Image).  
 https://hub.docker.com/_/elasticsearch
 
 ## Installation
@@ -232,6 +232,12 @@ https://hub.docker.com/_/elasticsearch
 
 ```
 $ pip install evtx2es
+```
+
+### with uv
+
+```
+$ uv add evtx2es
 ```
 
 ### from GitHub Releases
@@ -249,7 +255,7 @@ $ ./evtx2es {{options...}}
 
 ## Contributing
 
-The source code for evtx2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/evtx2es).
+The source code for evtx2es is hosted on GitHub. You can download, fork, and review it from this repository: https://github.com/sumeshi/evtx2es.
 Please report issues and feature requests. :sushi: :sushi: :sushi:
 
 ## License
