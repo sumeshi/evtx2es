@@ -1,14 +1,8 @@
 ---
 description: 
 globs: 
-alwaysApply: false
----
----
-description: Task execution framework
-globs: ["**/*"]
 alwaysApply: true
 ---
-
 # Task Execution Framework
 
 You are an AI assistant with advanced problem-solving capabilities. Follow these instructions to perform tasks efficiently and accurately.

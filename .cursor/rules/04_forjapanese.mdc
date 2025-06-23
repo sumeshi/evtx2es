@@ -1,14 +1,8 @@
 ---
 description: 
 globs: 
-alwaysApply: false
----
----
-description: Japanese language settings for development
-globs: ["**/*"]
 alwaysApply: true
 ---
-
 # 日本語設定ルール
 
 ## 基本設定

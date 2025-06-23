@@ -1,14 +1,8 @@
 ---
 description: 
 globs: 
-alwaysApply: false
----
----
-description: Project-specific rules for evtx2es
-globs: ["**/*"]
 alwaysApply: true
 ---
-
 # evtx2es - Project Specific Rules
 
 ## Project Overview
