@@ -18,6 +18,7 @@ class Evtx2jsonView(BaseView):
         self.parser.add_argument("--output-file", "-o", type=str, default="", help="json file path to output.")
         self.parser.add_argument("--datasetdate", default=None, help="Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS")
 
+
     def run(self):
 
         # shift timestamp
@@ -27,11 +28,15 @@ class Evtx2jsonView(BaseView):
         else:
             shift = '0'
 
-        view = Evtx2jsonView()
-        view.log(f"Converting {self.args.evtx_file}.", self.args.quiet)
+        # Parse tags
+        additional_tags = None
+        if self.args.tags:
+            additional_tags = [tag.strip() for tag in self.args.tags.split(',') if tag.strip()]
+
+        self.log(f"Converting {self.args.evtx_file}.", self.args.quiet)
 
         if self.args.multiprocess:
-            view.log(f"Multi-Process: {cpu_count()}", self.args.quiet)
+            self.log(f"Multi-Process: {cpu_count()}", self.args.quiet)
 
         Evtx2jsonPresenter(
             input_path=self.args.evtx_file,
@@ -40,9 +45,10 @@ class Evtx2jsonView(BaseView):
             is_quiet=self.args.quiet,
             multiprocess=self.args.multiprocess,
             chunk_size=int(self.args.size),
+            additional_tags=additional_tags,
         ).export_json()
 
-        view.log("Converted.", self.args.quiet)
+        self.log("Converted.", self.args.quiet)
 
 
 def entry_point():

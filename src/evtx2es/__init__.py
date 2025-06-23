@@ -20,7 +20,8 @@ def evtx2es(
     login: str = "",
     pwd: str = "",
     multiprocess: bool = False,
-    chunk_size: int = 500
+    chunk_size: int = 500,
+    additional_tags: List[str] = None
 ) -> None:
     """Fast import of Windows Eventlog into Elasticsearch.
     Args:
@@ -56,6 +57,9 @@ def evtx2es(
 
         chunk_size (int, optional):
             Size of the chunk to be processed for each process.
+
+        additional_tags (List[str], optional):
+            Additional tags to add to each record.
     """
 
     Evtx2esPresenter(
@@ -71,22 +75,25 @@ def evtx2es(
         is_quiet=True,
         multiprocess=multiprocess,
         chunk_size=int(chunk_size),
+        additional_tags=additional_tags,
     ).bulk_import()
 
 
-def evtx2json(input_path: str, shift: Union[str, datetime], multiprocess: bool = False, chunk_size: int = 500) -> List[dict]:
+def evtx2json(input_path: str, shift: Union[str, datetime] = '0', multiprocess: bool = False, chunk_size: int = 500, additional_tags: List[str] = None) -> List[dict]:
     """Convert Windows Eventlog to List[dict].
 
     Args:
         input_path (str): Input Eventlog file.
+        shift (Union[str, datetime]): Timestamp shift value. Defaults to '0'.
         multiprocess (bool): Flag to run multiprocessing.
         chunk_size (int): Size of the chunk to be processed for each process.
+        additional_tags (List[str], optional): Additional tags to add to each record.
 
     Note:
         Since the content of the file is loaded into memory at once,
         it requires the same amount of memory as the file to be loaded.
     """
     evtx = Evtx2es(Path(input_path).resolve())
-    records: List[dict] = sum(list(evtx.gen_records(multiprocess=multiprocess, chunk_size=chunk_size)), list())
+    records: List[dict] = sum(list(evtx.gen_records(shift=shift, multiprocess=multiprocess, chunk_size=chunk_size, additional_tags=additional_tags)), list())
 
     return records

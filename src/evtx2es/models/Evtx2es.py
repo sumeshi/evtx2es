@@ -2,10 +2,9 @@
 from datetime import datetime, timedelta
 from itertools import chain
 from pathlib import Path
-from typing import List, Generator, Iterable, Union
+from typing import List, Generator, Iterable, Union, Any
 from itertools import islice
 import multiprocessing as mp
-from multiprocessing import cpu_count
 import sys
 import os
 
@@ -56,131 +55,208 @@ def generate_chunks(chunk_size: int, iterable: Iterable) -> Generator:
         piece = list(islice(i, chunk_size))
 
 
-def format_record(record: dict, filepath: str, shift: Union[str, datetime]):
-    """Formatting each Eventlog records.
-
-    Args:
-        records (List[str]): chunk of Eventlog records(json).
-        shift (str): datetime string
-
-    Yields:
-        List[dict]: Eventlog records.
-    """
-
-    record["data"] = orjson.loads(record.get("data"))
-
-    eventid_field = record.get("data", {}).get("Event", {}).get("System", {}).get("EventID")
-    if type(eventid_field) is dict:
-        record["data"]["Event"]["System"]["EventID"] = eventid_field.get("#text")
-
+def _parse_event_data(record: dict) -> dict:
+    """Parse and extract event data from raw record."""
+    data = orjson.loads(record.get("data"))
+    event = data["Event"]
+    system = event["System"]
+    
+    # Fix EventID field if it's a dictionary
+    if isinstance(system.get("EventID"), dict):
+        system["EventID"] = system["EventID"].get("#text")
+    
+    # Clear Status field in EventData (matches original behavior)
     try:
-        status = record.get("data").get("Event").get("EventData").get("Status")
-        record["data"]["Event"]["EventData"]["Status"] = None
+        status = event.get("EventData", {}).get("Status")
+        if "EventData" in event and event["EventData"] is not None:
+            event["EventData"]["Status"] = None
     except Exception:
         pass
-
-    # Convert data according to ECS (sort of)
-    # First copy system fields
-    record["winlog"] = {
-        "channel": record["data"]["Event"]["System"]["Channel"],
-        "computer_name": record["data"]["Event"]["System"]["Computer"],
-        "event_id": record["data"]["Event"]["System"]["EventID"],
-        "opcode": record["data"]["Event"]["System"].get("Opcode"),
-        "provider_guid": record["data"]["Event"]["System"]["Provider"][
-            "#attributes"
-        ].get("Guid"),
-        "provider_name": record["data"]["Event"]["System"]["Provider"][
-            "#attributes"
-        ]["Name"],
-        "record_id": record["data"]["Event"]["System"]["EventRecordID"],
-        "task": record["data"]["Event"]["System"]["Task"],
-        "version": record["data"]["Event"]["System"].get("Version"),
+    
+    return {
+        "system": system,
+        "event_data": event.get("EventData", {}),
+        "user_data": event.get("UserData", {}),
     }
-    try:
-        record["winlog"]["process"] = {
-            "pid": record["data"]["Event"]["System"]["Execution"]["#attributes"][
-                "ProcessID"
-            ],
-            "thread_id": record["data"]["Event"]["System"]["Execution"][
-                "#attributes"
-            ]["ThreadID"],
-        }
-    except KeyError:
-        pass
 
-    except TypeError:
-        pass
-
-    try:
-        record["userdata"] = record["data"]["Event"].get(
-            "UserData", dict()
-        )
-    except KeyError:
-        pass
-
-    except TypeError:
-        pass
-
-    record.update(
-        {
-            "log": {"file": {"name": filepath}},
-            "event": {
-                "code": record["winlog"]["event_id"],
-                "created": record["data"]["Event"]["System"]["TimeCreated"][
-                    "#attributes"
-                ]["SystemTime"],
-            },
-        }
-    )
-
-    # Shift timestamp
-    if shift != '0':
-        current_timestamp = datetime.strptime(record["event"]["created"], "%Y-%m-%d"'T'"%H:%M:%S.%fZ")
+def _create_timestamp_field(system_time: str, shift: Union[str, datetime]) -> str:
+    """Create timestamp field with optional shift."""
+    if shift != '0' and isinstance(shift, datetime):
+        current_timestamp = datetime.strptime(system_time, "%Y-%m-%d"'T'"%H:%M:%S.%fZ")
         final_timestamp = current_timestamp + timedelta(seconds=shift.seconds) + timedelta(days=shift.days)
-        record["@timestamp"] = final_timestamp.strftime("%Y-%m-%d"'T'"%H:%M:%S.%fZ")
+        return final_timestamp.strftime("%Y-%m-%d"'T'"%H:%M:%S.%fZ")
     else:
-        record["@timestamp"] = record["event"]["created"]
+        return system_time
 
-    # Move event attributes to ECS location
-    record["winlog"]["event_data"] = record["data"]["Event"].get(
-        "EventData", dict()
+
+def _normalize_field_value(key: str, value) -> Any:
+    """Normalize specific field values for ProcessId and numeric ranges."""
+    # Normalize ProcessId fields
+    if key in ("ProcessId") and isinstance(value, str):
+        if value.startswith("0x"):
+            return int(value, 16)
+        else:
+            try:
+                return int(value)
+            except ValueError:
+                return 0
+    
+    # Limit numeric values for Elasticsearch
+    if isinstance(value, int):
+        if value < -(2 ** 63):
+            return -(2 ** 63)
+        elif value > 2 ** 63 - 1:
+            return 2 ** 63 - 1
+    
+    return value
+
+
+def _create_normalized_event_data(event_data: dict) -> dict:
+    """Create normalized event_data fields."""
+    if not event_data or len(event_data) == 0:
+        return {}
+    
+    normalized_data = {}
+    for k, v in event_data.items():
+        normalized_data[k] = _normalize_field_value(k, v)
+    
+    return normalized_data
+
+
+def format_record(record: dict, filepath: str, shift: Union[str, datetime], additional_tags: List[str] = None) -> dict:
+    """Format Eventlog record into structured JSON.
+
+    Args:
+        record (dict): Raw eventlog record with 'data' field containing JSON string.
+        filepath (str): File path for logging.
+        shift (Union[str, datetime]): Timestamp shift value.
+        additional_tags (List[str], optional): Additional tags to add to the record.
+
+    Returns:
+        dict: Formatted eventlog record with structure:
+        {
+            "@timestamp": str,
+            "event": {
+                "action": str,
+                "category": [str],
+                "type": [str],
+                "kind": "event",
+                "provider": str,
+                "module": "windows",
+                "dataset": "windows.eventlog",
+                "code": int,
+                "created": str
+            },
+            "winlog": {
+                "channel": str,
+                "computer_name": str,
+                "event_id": int,
+                "record_id": int,
+                "opcode": int,
+                "task": int,
+                "version": int,
+                "provider": {"name": str, "guid": str},
+                "event_data": dict (optional)
+            },
+            "userdata": dict (optional),
+            "process": {"pid": int, "thread": {"id": int}} (optional),
+            "log": {
+                "file": {"path": str}
+            },
+            "tags": [str]
+        }
+    """
+    # User defined tags
+    tags = ["eventlog"]
+    if additional_tags:
+        tags.extend(additional_tags)
+
+    # Parse the raw event data
+    parsed_data = _parse_event_data(record)
+    
+    system = parsed_data["system"]
+    channel = system["Channel"]
+    event_id = system["EventID"]
+    provider_attrs = system["Provider"]["#attributes"]
+    timestamp = _create_timestamp_field(
+        system["TimeCreated"]["#attributes"]["SystemTime"], 
+        shift
     )
-    del record["data"]
-    if (
-        record["winlog"]["event_data"] is None
-        or len(record["winlog"]["event_data"]) == 0
-    ):  # remove event_data fields if empty
-        del record["winlog"]["event_data"]
-    else:
-        if record["winlog"]["event_data"]:
-            for k, v in record["winlog"]["event_data"].items():
-                # Normalize some known problematic fields with values switching between integers and strings with hexadecimal notation to integers
-                if k in ("ProcessId") and type(v) == str:
-                    if v.startswith("0x"):
-                        record["winlog"]["event_data"][k] = int(v, 16)
-                    else:
-                        try:
-                            record["winlog"]["event_data"][k] = int(v)
-                        except ValueError:
-                            record["winlog"]["event_data"][k] = 0
+    
+    # Create ECS-compliant event fields
+    event_fields = {
+        "action": f"eventlog-{channel.lower()}-{event_id}",
+        "category": ["host"],
+        "type": ["info"],
+        "kind": "event",
+        "provider": provider_attrs["Name"].lower(),
+        "module": "windows",
+        "dataset": "windows.eventlog",
+        "code": event_id,
+        "created": system["TimeCreated"]["#attributes"]["SystemTime"],
+    }
+    
+    # Create Windows-specific fields
+    windows_eventlog = {
+        "channel": channel,
+        "computer_name": system["Computer"],
+        "event_id": event_id,
+        "opcode": system.get("Opcode"),
+        "record_id": system["EventRecordID"],
+        "task": system["Task"],
+        "version": system.get("Version"),
+        "provider": {
+            "name": provider_attrs["Name"],
+            "guid": provider_attrs.get("Guid")
+        }
+    }
+    
+    # Add event_data if present
+    normalized_event_data = _create_normalized_event_data(parsed_data["event_data"])
+    if normalized_event_data:
+        windows_eventlog["event_data"] = normalized_event_data
+    
+    # Build the final ECS-compliant result object
+    result = {
+        "@timestamp": timestamp,
+        "event": event_fields,
+        "winlog": windows_eventlog,
+        # user_data (optional)
+        # process (optional)
+        # log.file.path
+        # tags
+    }
 
-                # Maximum limit of numeric values in Elasticsearch
-                if type(v) is int:
-                    if v < -(2 ** 63):
-                        record["winlog"]["event_data"][k] = -(2 ** 63)
-                    elif v > 2 ** 63 - 1:
-                        record["winlog"]["event_data"][k] = 2 ** 63 - 1
+    # Add userdata if present
+    if parsed_data["user_data"]:
+        result["userdata"] = parsed_data["user_data"]
+    
+    # Add process fields if available
+    try:
+        execution_attrs = system["Execution"]["#attributes"]
+        result["process"] = {
+            "pid": int(execution_attrs["ProcessID"]),
+            "thread": {
+                "id": int(execution_attrs["ThreadID"])
+            }
+        }
+    except (KeyError, TypeError, ValueError):
+        pass
+    
+    result["log"] = {"file": {"path": str(Path(filepath).resolve())}}
+    result["tags"] = tags
 
-    return record
+    return result
 
 
-def process_by_chunk(records: List[str], filepath: Union[Generator, str], shift: Union[Generator, str, datetime]) -> List[dict]:
+def process_by_chunk(records: List[str], filepath: Union[Generator, str], shift: Union[Generator, str, datetime], additional_tags: Union[Generator, List[str]] = None) -> List[dict]:
     """Perform formatting for each chunk. (for efficiency)
 
     Args:
         records (List[str]): chunk of Eventlog records(json).
         filepath (List[str]): list with 1 element.
         shift (List[Union[str, datetime]]): list with 1 element
+        additional_tags (List[str], optional): Additional tags to add to each record.
 
     Yields:
         List[dict]: Eventlog records list.
@@ -188,12 +264,13 @@ def process_by_chunk(records: List[str], filepath: Union[Generator, str], shift:
 
     filepath = filepath if type(filepath) is str else filepath.__next__()
     shift = shift if type(shift) is str else shift.__next__()
+    additional_tags = additional_tags if isinstance(additional_tags, list) else (additional_tags.__next__() if additional_tags else None)
 
     concatenated_json: str = f"[{','.join([orjson.dumps(record).decode('utf-8') for record in records])}]"
     record_list: List[dict] = orjson.loads(concatenated_json)
 
     return [
-        format_record(record, filepath=filepath, shift=shift) for record in record_list
+        format_record(record, filepath=filepath, shift=shift, additional_tags=additional_tags) for record in record_list
     ]
 
 
@@ -202,12 +279,14 @@ class Evtx2es(SafeMultiprocessingMixin):
         self.path = input_path
         self.parser = PyEvtxParser(self.path.open(mode="rb"))
 
-    def gen_records(self, shift: Union[str, datetime], multiprocess: bool, chunk_size: int) -> Generator:
+    def gen_records(self, shift: Union[str, datetime], multiprocess: bool, chunk_size: int, additional_tags: List[str] = None) -> Generator:
         """Generates the formatted Eventlog records chunks.
 
         Args:
+            shift (Union[str, datetime]): Timestamp shift value.
             multiprocess (bool): Flag to run multiprocessing.
             chunk_size (int): Size of the chunk to be processed for each process.
+            additional_tags (List[str], optional): Additional tags to add to each record.
 
         Yields:
             Generator: Yields List[dict].
@@ -215,6 +294,11 @@ class Evtx2es(SafeMultiprocessingMixin):
 
         gen_path = iter(lambda: str(self.path), None)
         gen_shift = iter(lambda: shift, None)
+        # Create a proper generator for additional_tags
+        def gen_tags():
+            while True:
+                yield additional_tags
+        gen_tags = gen_tags()
 
         if multiprocess:
             # Use safe context for Python 3.13 compatibility
@@ -226,6 +310,7 @@ class Evtx2es(SafeMultiprocessingMixin):
                         generate_chunks(chunk_size, self.parser.records_json()),
                         gen_path,
                         gen_shift,
+                        gen_tags,
                     )
                 )
                 yield list(chain.from_iterable(results.get(timeout=None)))
@@ -236,6 +321,6 @@ class Evtx2es(SafeMultiprocessingMixin):
                     yield list(chain.from_iterable(buffer))
                     buffer.clear()
                 else:
-                    buffer.append(process_by_chunk(records, gen_path, gen_shift))
+                    buffer.append(process_by_chunk(records, gen_path, gen_shift, gen_tags))
             else:
                 yield list(chain.from_iterable(buffer))

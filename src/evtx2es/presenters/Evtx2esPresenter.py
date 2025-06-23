@@ -1,7 +1,7 @@
 # coding: utf-8
 import traceback
 from datetime import datetime
-from typing import List, Union
+from typing import List, Union, Callable, Optional
 from pathlib import Path
 
 from tqdm import tqdm
@@ -26,7 +26,8 @@ class Evtx2esPresenter(object):
         is_quiet: bool = False,
         multiprocess: bool = False,
         chunk_size: int = 500,
-        logger=None
+        additional_tags: List[str] = None,
+        logger: Optional[Callable[[str, bool], None]] = None
     ):
         self.input_path = input_path
         self.host = host
@@ -40,11 +41,12 @@ class Evtx2esPresenter(object):
         self.is_quiet = is_quiet
         self.multiprocess = multiprocess
         self.chunk_size = chunk_size
+        self.additional_tags = additional_tags
         self.logger = logger
 
     def evtx2es(self) -> List[List[dict]]:
         r = Evtx2es(self.input_path)
-        generator = r.gen_records(self.shift, self.multiprocess, self.chunk_size) if self.is_quiet else tqdm(r.gen_records(self.shift, self.multiprocess, self.chunk_size))
+        generator = r.gen_records(self.shift, self.multiprocess, self.chunk_size, self.additional_tags) if self.is_quiet else tqdm(r.gen_records(self.shift, self.multiprocess, self.chunk_size, self.additional_tags))
 
         buffer: List[List[dict]] = generator
         return buffer

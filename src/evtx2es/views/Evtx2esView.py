@@ -32,6 +32,7 @@ class Evtx2esView(BaseView):
         self.parser.add_argument("--login", default="", help="Login to use to connect to Elastic database")
         self.parser.add_argument("--pwd", default="", help="Password associated with the login")
 
+
     def __list_evtx_files(self, evtx_files: List[str]) -> List[Path]:
         evtx_path_list: List[Path] = list()
         for evtx_file in evtx_files:
@@ -49,6 +50,11 @@ class Evtx2esView(BaseView):
             shift = datetime.now() - dataset_date
         else:
             shift = '0'
+
+        # Parse tags
+        additional_tags = None
+        if self.args.tags:
+            additional_tags = [tag.strip() for tag in self.args.tags.split(',') if tag.strip()]
 
         evtx_files = self.__list_evtx_files(self.args.evtx_files)
 
@@ -71,6 +77,7 @@ class Evtx2esView(BaseView):
                 is_quiet=self.args.quiet,
                 multiprocess=self.args.multiprocess,
                 chunk_size=int(self.args.size),
+                additional_tags=additional_tags,
                 logger=self.log
             ).bulk_import()
 
