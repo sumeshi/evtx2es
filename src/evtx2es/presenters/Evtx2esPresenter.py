@@ -20,14 +20,14 @@ class Evtx2esPresenter(object):
         index: str = "evtx2es",
         scheme: str = "http",
         pipeline: str = "",
-        shift: Union[str, datetime] = '0',
+        shift: Union[str, datetime] = "0",
         login: str = "",
         pwd: str = "",
         is_quiet: bool = False,
         multiprocess: bool = False,
         chunk_size: int = 500,
         additional_tags: List[str] = None,
-        logger: Optional[Callable[[str, bool], None]] = None
+        logger: Optional[Callable[[str, bool], None]] = None,
     ):
         self.input_path = input_path
         self.host = host
@@ -46,7 +46,17 @@ class Evtx2esPresenter(object):
 
     def evtx2es(self) -> List[List[dict]]:
         r = Evtx2es(self.input_path)
-        generator = r.gen_records(self.shift, self.multiprocess, self.chunk_size, self.additional_tags) if self.is_quiet else tqdm(r.gen_records(self.shift, self.multiprocess, self.chunk_size, self.additional_tags))
+        generator = (
+            r.gen_records(
+                self.shift, self.multiprocess, self.chunk_size, self.additional_tags
+            )
+            if self.is_quiet
+            else tqdm(
+                r.gen_records(
+                    self.shift, self.multiprocess, self.chunk_size, self.additional_tags
+                )
+            )
+        )
 
         buffer: List[List[dict]] = generator
         return buffer
@@ -57,7 +67,7 @@ class Evtx2esPresenter(object):
             port=self.port,
             scheme=self.scheme,
             login=self.login,
-            pwd=self.pwd
+            pwd=self.pwd,
         )
 
         # Buffer for collecting results
@@ -72,7 +82,7 @@ class Evtx2esPresenter(object):
                 if failed:
                     total_failed.extend(failed)
                 batch_count += 1
-                            
+
             except Exception:
                 if self.logger:
                     self.logger("Error occurred during bulk indexing", self.is_quiet)
@@ -80,9 +90,15 @@ class Evtx2esPresenter(object):
 
         # Log summary results after tqdm completes
         if self.logger:
-            self.logger(f"Bulk import completed: {batch_count} batches processed", self.is_quiet)
-            self.logger(f"Successfully indexed: {total_success} documents", self.is_quiet)
+            self.logger(
+                f"Bulk import completed: {batch_count} batches processed", self.is_quiet
+            )
+            self.logger(
+                f"Successfully indexed: {total_success} documents", self.is_quiet
+            )
             if total_failed:
-                self.logger(f"Failed to index: {len(total_failed)} documents", self.is_quiet)
+                self.logger(
+                    f"Failed to index: {len(total_failed)} documents", self.is_quiet
+                )
                 for failure in total_failed[:3]:  # Show first 3 failures
                     self.logger(f"Error: {failure}", self.is_quiet)

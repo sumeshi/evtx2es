@@ -35,9 +35,15 @@ class Evtx2jsonPresenter(object):
     def evtx2json(self) -> List[dict]:
         r = Evtx2es(self.input_path)
         generator = (
-            r.gen_records(self.shift, self.multiprocess, self.chunk_size, self.additional_tags)
+            r.gen_records(
+                self.shift, self.multiprocess, self.chunk_size, self.additional_tags
+            )
             if self.is_quiet
-            else tqdm(r.gen_records(self.shift, self.multiprocess, self.chunk_size, self.additional_tags))
+            else tqdm(
+                r.gen_records(
+                    self.shift, self.multiprocess, self.chunk_size, self.additional_tags
+                )
+            )
         )
 
         buffer: List[dict] = list(chain.from_iterable(generator))

@@ -14,21 +14,21 @@ from evtx import PyEvtxParser
 
 class SafeMultiprocessingMixin:
     """Safe multiprocessing management class for Python 3.13 compatibility"""
-    
+
     @staticmethod
     def get_multiprocessing_context() -> mp.context:
         """Get safe multiprocessing context"""
         # Use spawn for Python 3.13+ or test environments to avoid fork() issues
-        if sys.version_info >= (3, 13) or 'pytest' in sys.modules:
+        if sys.version_info >= (3, 13) or "pytest" in sys.modules:
             try:
-                ctx = mp.get_context('spawn')
+                ctx = mp.get_context("spawn")
             except RuntimeError:
                 ctx = mp.get_context()
         else:
             ctx = mp.get_context()
-        
+
         return ctx
-    
+
     @staticmethod
     def get_cpu_count() -> int:
         """Get CPU count safely"""
@@ -60,11 +60,11 @@ def _parse_event_data(record: dict) -> dict:
     data = orjson.loads(record.get("data"))
     event = data["Event"]
     system = event["System"]
-    
+
     # Fix EventID field if it's a dictionary
     if isinstance(system.get("EventID"), dict):
         system["EventID"] = system["EventID"].get("#text")
-    
+
     # Clear Status field in EventData (matches original behavior)
     try:
         status = event.get("EventData", {}).get("Status")
@@ -72,19 +72,26 @@ def _parse_event_data(record: dict) -> dict:
             event["EventData"]["Status"] = None
     except Exception:
         pass
-    
+
     return {
         "system": system,
         "event_data": event.get("EventData", {}),
         "user_data": event.get("UserData", {}),
     }
 
+
 def _create_timestamp_field(system_time: str, shift: Union[str, datetime]) -> str:
     """Create timestamp field with optional shift."""
-    if shift != '0' and isinstance(shift, datetime):
-        current_timestamp = datetime.strptime(system_time, "%Y-%m-%d"'T'"%H:%M:%S.%fZ")
-        final_timestamp = current_timestamp + timedelta(seconds=shift.seconds) + timedelta(days=shift.days)
-        return final_timestamp.strftime("%Y-%m-%d"'T'"%H:%M:%S.%fZ")
+    if shift != "0" and isinstance(shift, datetime):
+        current_timestamp = datetime.strptime(
+            system_time, "%Y-%m-%d" "T" "%H:%M:%S.%fZ"
+        )
+        final_timestamp = (
+            current_timestamp
+            + timedelta(seconds=shift.seconds)
+            + timedelta(days=shift.days)
+        )
+        return final_timestamp.strftime("%Y-%m-%d" "T" "%H:%M:%S.%fZ")
     else:
         return system_time
 
@@ -100,14 +107,14 @@ def _normalize_field_value(key: str, value) -> Any:
                 return int(value)
             except ValueError:
                 return 0
-    
+
     # Limit numeric values for Elasticsearch
     if isinstance(value, int):
-        if value < -(2 ** 63):
-            return -(2 ** 63)
-        elif value > 2 ** 63 - 1:
-            return 2 ** 63 - 1
-    
+        if value < -(2**63):
+            return -(2**63)
+        elif value > 2**63 - 1:
+            return 2**63 - 1
+
     return value
 
 
@@ -115,15 +122,20 @@ def _create_normalized_event_data(event_data: dict) -> dict:
     """Create normalized event_data fields."""
     if not event_data or len(event_data) == 0:
         return {}
-    
+
     normalized_data = {}
     for k, v in event_data.items():
         normalized_data[k] = _normalize_field_value(k, v)
-    
+
     return normalized_data
 
 
-def format_record(record: dict, filepath: str, shift: Union[str, datetime], additional_tags: List[str] = None) -> dict:
+def format_record(
+    record: dict,
+    filepath: str,
+    shift: Union[str, datetime],
+    additional_tags: List[str] = None,
+) -> dict:
     """Format Eventlog record into structured JSON.
 
     Args:
@@ -173,16 +185,15 @@ def format_record(record: dict, filepath: str, shift: Union[str, datetime], addi
 
     # Parse the raw event data
     parsed_data = _parse_event_data(record)
-    
+
     system = parsed_data["system"]
     channel = system["Channel"]
     event_id = system["EventID"]
     provider_attrs = system["Provider"]["#attributes"]
     timestamp = _create_timestamp_field(
-        system["TimeCreated"]["#attributes"]["SystemTime"], 
-        shift
+        system["TimeCreated"]["#attributes"]["SystemTime"], shift
     )
-    
+
     # Create ECS-compliant event fields
     event_fields = {
         "action": f"eventlog-{channel.lower()}-{event_id}",
@@ -195,7 +206,7 @@ def format_record(record: dict, filepath: str, shift: Union[str, datetime], addi
         "code": event_id,
         "created": system["TimeCreated"]["#attributes"]["SystemTime"],
     }
-    
+
     # Create Windows-specific fields
     windows_eventlog = {
         "channel": channel,
@@ -207,15 +218,15 @@ def format_record(record: dict, filepath: str, shift: Union[str, datetime], addi
         "version": system.get("Version"),
         "provider": {
             "name": provider_attrs["Name"],
-            "guid": provider_attrs.get("Guid")
-        }
+            "guid": provider_attrs.get("Guid"),
+        },
     }
-    
+
     # Add event_data if present
     normalized_event_data = _create_normalized_event_data(parsed_data["event_data"])
     if normalized_event_data:
         windows_eventlog["event_data"] = normalized_event_data
-    
+
     # Build the final ECS-compliant result object
     result = {
         "@timestamp": timestamp,
@@ -230,26 +241,29 @@ def format_record(record: dict, filepath: str, shift: Union[str, datetime], addi
     # Add userdata if present
     if parsed_data["user_data"]:
         result["userdata"] = parsed_data["user_data"]
-    
+
     # Add process fields if available
     try:
         execution_attrs = system["Execution"]["#attributes"]
         result["process"] = {
             "pid": int(execution_attrs["ProcessID"]),
-            "thread": {
-                "id": int(execution_attrs["ThreadID"])
-            }
+            "thread": {"id": int(execution_attrs["ThreadID"])},
         }
     except (KeyError, TypeError, ValueError):
         pass
-    
+
     result["log"] = {"file": {"path": str(Path(filepath).resolve())}}
     result["tags"] = tags
 
     return result
 
 
-def process_by_chunk(records: List[str], filepath: Union[Generator, str], shift: Union[Generator, str, datetime], additional_tags: Union[Generator, List[str]] = None) -> List[dict]:
+def process_by_chunk(
+    records: List[str],
+    filepath: Union[Generator, str],
+    shift: Union[Generator, str, datetime],
+    additional_tags: Union[Generator, List[str]] = None,
+) -> List[dict]:
     """Perform formatting for each chunk. (for efficiency)
 
     Args:
@@ -264,13 +278,22 @@ def process_by_chunk(records: List[str], filepath: Union[Generator, str], shift:
 
     filepath = filepath if type(filepath) is str else filepath.__next__()
     shift = shift if type(shift) is str else shift.__next__()
-    additional_tags = additional_tags if isinstance(additional_tags, list) else (additional_tags.__next__() if additional_tags else None)
+    additional_tags = (
+        additional_tags
+        if isinstance(additional_tags, list)
+        else (additional_tags.__next__() if additional_tags else None)
+    )
 
-    concatenated_json: str = f"[{','.join([orjson.dumps(record).decode('utf-8') for record in records])}]"
+    concatenated_json: str = (
+        f"[{','.join([orjson.dumps(record).decode('utf-8') for record in records])}]"
+    )
     record_list: List[dict] = orjson.loads(concatenated_json)
 
     return [
-        format_record(record, filepath=filepath, shift=shift, additional_tags=additional_tags) for record in record_list
+        format_record(
+            record, filepath=filepath, shift=shift, additional_tags=additional_tags
+        )
+        for record in record_list
     ]
 
 
@@ -279,7 +302,13 @@ class Evtx2es(SafeMultiprocessingMixin):
         self.path = input_path
         self.parser = PyEvtxParser(self.path.open(mode="rb"))
 
-    def gen_records(self, shift: Union[str, datetime], multiprocess: bool, chunk_size: int, additional_tags: List[str] = None) -> Generator:
+    def gen_records(
+        self,
+        shift: Union[str, datetime],
+        multiprocess: bool,
+        chunk_size: int,
+        additional_tags: List[str] = None,
+    ) -> Generator:
         """Generates the formatted Eventlog records chunks.
 
         Args:
@@ -294,10 +323,12 @@ class Evtx2es(SafeMultiprocessingMixin):
 
         gen_path = iter(lambda: str(self.path), None)
         gen_shift = iter(lambda: shift, None)
+
         # Create a proper generator for additional_tags
         def gen_tags():
             while True:
                 yield additional_tags
+
         gen_tags = gen_tags()
 
         if multiprocess:
@@ -311,7 +342,7 @@ class Evtx2es(SafeMultiprocessingMixin):
                         gen_path,
                         gen_shift,
                         gen_tags,
-                    )
+                    ),
                 )
                 yield list(chain.from_iterable(results.get(timeout=None)))
         else:
@@ -321,6 +352,8 @@ class Evtx2es(SafeMultiprocessingMixin):
                     yield list(chain.from_iterable(buffer))
                     buffer.clear()
                 else:
-                    buffer.append(process_by_chunk(records, gen_path, gen_shift, gen_tags))
+                    buffer.append(
+                        process_by_chunk(records, gen_path, gen_shift, gen_tags)
+                    )
             else:
                 yield list(chain.from_iterable(buffer))

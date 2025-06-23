@@ -9,6 +9,7 @@ from evtx2es.presenters.Evtx2esPresenter import Evtx2esPresenter
 
 # for use via python-script!
 
+
 def evtx2es(
     input_path: str,
     host: str = "localhost",
@@ -16,12 +17,12 @@ def evtx2es(
     index: str = "evtx2es",
     scheme: str = "http",
     pipeline: str = "",
-    shift: str = '0',
+    shift: str = "0",
     login: str = "",
     pwd: str = "",
     multiprocess: bool = False,
     chunk_size: int = 500,
-    additional_tags: List[str] = None
+    additional_tags: List[str] = None,
 ) -> None:
     """Fast import of Windows Eventlog into Elasticsearch.
     Args:
@@ -79,7 +80,13 @@ def evtx2es(
     ).bulk_import()
 
 
-def evtx2json(input_path: str, shift: Union[str, datetime] = '0', multiprocess: bool = False, chunk_size: int = 500, additional_tags: List[str] = None) -> List[dict]:
+def evtx2json(
+    input_path: str,
+    shift: Union[str, datetime] = "0",
+    multiprocess: bool = False,
+    chunk_size: int = 500,
+    additional_tags: List[str] = None,
+) -> List[dict]:
     """Convert Windows Eventlog to List[dict].
 
     Args:
@@ -94,6 +101,16 @@ def evtx2json(input_path: str, shift: Union[str, datetime] = '0', multiprocess: 
         it requires the same amount of memory as the file to be loaded.
     """
     evtx = Evtx2es(Path(input_path).resolve())
-    records: List[dict] = sum(list(evtx.gen_records(shift=shift, multiprocess=multiprocess, chunk_size=chunk_size, additional_tags=additional_tags)), list())
+    records: List[dict] = sum(
+        list(
+            evtx.gen_records(
+                shift=shift,
+                multiprocess=multiprocess,
+                chunk_size=chunk_size,
+                additional_tags=additional_tags,
+            )
+        ),
+        list(),
+    )
 
     return records

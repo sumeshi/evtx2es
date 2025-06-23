@@ -12,11 +12,33 @@ class BaseView(metaclass=ABCMeta):
         self.__define_common_options()
 
     def __define_common_options(self):
-        self.parser.add_argument("--version", "-v", action="version", version=get_version('evtx2es'))
-        self.parser.add_argument("--quiet", "-q", action='store_true', help="flag to suppress standard output.")
-        self.parser.add_argument("--multiprocess", "-m", action='store_true', help="flag to run multiprocessing.")
-        self.parser.add_argument("--size", "-s", type=int, default=500, help="size of the chunk to be processed for each process.")
-        self.parser.add_argument("--tags", default="", help="Comma-separated tags to add to each record for identification (e.g., hostname, domain name)")
+        self.parser.add_argument(
+            "--version", "-v", action="version", version=get_version("evtx2es")
+        )
+        self.parser.add_argument(
+            "--quiet",
+            "-q",
+            action="store_true",
+            help="flag to suppress standard output.",
+        )
+        self.parser.add_argument(
+            "--multiprocess",
+            "-m",
+            action="store_true",
+            help="flag to run multiprocessing.",
+        )
+        self.parser.add_argument(
+            "--size",
+            "-s",
+            type=int,
+            default=500,
+            help="size of the chunk to be processed for each process.",
+        )
+        self.parser.add_argument(
+            "--tags",
+            default="",
+            help="Comma-separated tags to add to each record for identification (e.g., hostname, domain name)",
+        )
 
     @abstractmethod
     def define_options(self):

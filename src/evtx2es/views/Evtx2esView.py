@@ -5,7 +5,7 @@ from datetime import datetime
 from multiprocessing import cpu_count
 
 from evtx2es.views.BaseView import BaseView
-from evtx2es.presenters.Evtx2esPresenter import Evtx2esPresenter 
+from evtx2es.presenters.Evtx2esPresenter import Evtx2esPresenter
 
 
 class Evtx2esView(BaseView):
@@ -23,15 +23,30 @@ class Evtx2esView(BaseView):
             help="Windows Eventlog or directories containing them. (filename must be set '.*.evtx', or '.*.EVTX')",
         )
 
-        self.parser.add_argument("--host", default="localhost", help="ElasticSearch host")
-        self.parser.add_argument("--port", default=9200, help="ElasticSearch port number")
+        self.parser.add_argument(
+            "--host", default="localhost", help="ElasticSearch host"
+        )
+        self.parser.add_argument(
+            "--port", default=9200, help="ElasticSearch port number"
+        )
         self.parser.add_argument("--index", default="evtx2es", help="Index name")
-        self.parser.add_argument("--scheme", default="http", help="Scheme to use (http, https)")
-        self.parser.add_argument("--pipeline", default="", help="Ingest pipeline to use")
-        self.parser.add_argument("--datasetdate", default=None, help="Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS")
-        self.parser.add_argument("--login", default="", help="Login to use to connect to Elastic database")
-        self.parser.add_argument("--pwd", default="", help="Password associated with the login")
-
+        self.parser.add_argument(
+            "--scheme", default="http", help="Scheme to use (http, https)"
+        )
+        self.parser.add_argument(
+            "--pipeline", default="", help="Ingest pipeline to use"
+        )
+        self.parser.add_argument(
+            "--datasetdate",
+            default=None,
+            help="Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS",
+        )
+        self.parser.add_argument(
+            "--login", default="", help="Login to use to connect to Elastic database"
+        )
+        self.parser.add_argument(
+            "--pwd", default="", help="Password associated with the login"
+        )
 
     def __list_evtx_files(self, evtx_files: List[str]) -> List[Path]:
         evtx_path_list: List[Path] = list()
@@ -46,15 +61,17 @@ class Evtx2esView(BaseView):
 
     def run(self):
         if self.args.datasetdate is not None:
-            dataset_date = datetime.strptime(self.args.datasetdate, '%m/%d/%Y.%H:%M:%S')
+            dataset_date = datetime.strptime(self.args.datasetdate, "%m/%d/%Y.%H:%M:%S")
             shift = datetime.now() - dataset_date
         else:
-            shift = '0'
+            shift = "0"
 
         # Parse tags
         additional_tags = None
         if self.args.tags:
-            additional_tags = [tag.strip() for tag in self.args.tags.split(',') if tag.strip()]
+            additional_tags = [
+                tag.strip() for tag in self.args.tags.split(",") if tag.strip()
+            ]
 
         evtx_files = self.__list_evtx_files(self.args.evtx_files)
 
@@ -78,7 +95,7 @@ class Evtx2esView(BaseView):
                 multiprocess=self.args.multiprocess,
                 chunk_size=int(self.args.size),
                 additional_tags=additional_tags,
-                logger=self.log
+                logger=self.log,
             ).bulk_import()
 
         self.log("Import completed.", self.args.quiet)

@@ -6,4 +6,4 @@ def get_version(name: str) -> str:
     try:
         return version(name)
     except PackageNotFoundError:
-        return ''
+        return ""
