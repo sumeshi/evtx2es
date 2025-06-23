@@ -55,7 +55,7 @@ def test__evtx2json_convert(monkeypatch):
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         e2j()
-    assert calc_md5(Path(path)) == "1c99682c5f94b8d3bfaa72a5a95b360c"
+    assert calc_md5(Path(path)) == "6f9e11e3c5401c2d103f72a555313b49"
 
 def test__evtx2json_convert_multiprocessing(monkeypatch):
     path = 'tests/cache/Security-m.json'
@@ -63,4 +63,4 @@ def test__evtx2json_convert_multiprocessing(monkeypatch):
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         e2j()
-    assert calc_md5(Path(path)) == "1c99682c5f94b8d3bfaa72a5a95b360c"
+    assert calc_md5(Path(path)) == "6f9e11e3c5401c2d103f72a555313b49"

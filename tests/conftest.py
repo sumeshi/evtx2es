@@ -1,4 +1,4 @@
-# config: utf-8
+# coding: utf-8
 import hashlib
 from pathlib import Path
 from urllib import request
