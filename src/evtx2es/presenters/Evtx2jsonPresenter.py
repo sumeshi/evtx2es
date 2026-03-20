@@ -9,7 +9,7 @@ from evtx2es.models.Evtx2es import Evtx2es
 from tqdm import tqdm
 
 
-class Evtx2jsonPresenter(object):
+class Evtx2jsonPresenter:
     def __init__(
         self,
         input_path: str,

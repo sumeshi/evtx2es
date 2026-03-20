@@ -8,20 +8,18 @@ from elasticsearch.helpers import bulk
 import orjson
 
 
-class ElasticsearchUtils(object):
+class ElasticsearchUtils:
     def __init__(
         self, hostname: str, port: int, scheme: str, login: str, pwd: str
     ) -> None:
-        if login == "":
-            self.es = Elasticsearch(
-                hosts=[f"{scheme}://{hostname}:{port}"], verify_certs=False
-            )
-        else:
-            self.es = Elasticsearch(
-                hosts=[f"{scheme}://{hostname}:{port}"],
-                verify_certs=False,
-                http_auth=(login, pwd),
-            )
+        kwargs = {
+            "hosts": [f"{scheme}://{hostname}:{port}"],
+            "verify_certs": False
+        }
+        if login != "":
+            kwargs["http_auth"] = (login, pwd)
+            
+        self.es = Elasticsearch(**kwargs)
 
     def calc_hash(self, record: dict) -> str:
         """Calculate hash value from record.
