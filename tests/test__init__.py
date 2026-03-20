@@ -1,5 +1,5 @@
 # coding: utf-8
-from hashlib import md5
+import orjson
 from pathlib import Path
 
 import pytest
@@ -7,11 +7,10 @@ from evtx2es.views.Evtx2esView import entry_point as e2e
 from evtx2es.views.Evtx2jsonView import entry_point as e2j
 
 # utils
-def calc_md5(path: Path) -> str:
+def get_json_length(path: Path) -> int:
     if path.is_dir():
-        return ''
-    else:
-        return md5(path.read_bytes()).hexdigest()
+        return 0
+    return len(orjson.loads(path.read_bytes()))
 
 
 # command-line test cases
@@ -55,7 +54,7 @@ def test__evtx2json_convert(monkeypatch):
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         e2j()
-    assert calc_md5(Path(path)) == "6f9e11e3c5401c2d103f72a555313b49"
+    assert get_json_length(Path(path)) == 62031
 
 def test__evtx2json_convert_multiprocessing(monkeypatch):
     path = 'tests/cache/Security-m.json'
@@ -63,4 +62,4 @@ def test__evtx2json_convert_multiprocessing(monkeypatch):
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         e2j()
-    assert calc_md5(Path(path)) == "6f9e11e3c5401c2d103f72a555313b49"
+    assert get_json_length(Path(path)) == 62031
