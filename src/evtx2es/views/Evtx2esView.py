@@ -20,7 +20,7 @@ class Evtx2esView(BaseView):
             "evtx_files",
             nargs="+",
             type=str,
-            help="Windows Eventlog or directories containing them. (filename must be set '.*.evtx', or '.*.EVTX')",
+            help="Windows Eventlog files or directories containing them. (Files must have a '.evtx' or '.EVTX' extension)",
         )
 
         self.parser.add_argument(
@@ -37,11 +37,6 @@ class Evtx2esView(BaseView):
             "--pipeline", default="", help="Ingest pipeline to use"
         )
         self.parser.add_argument(
-            "--datasetdate",
-            default=None,
-            help="Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS",
-        )
-        self.parser.add_argument(
             "--login", default="", help="Login to use to connect to Elastic database"
         )
         self.parser.add_argument(
@@ -49,29 +44,18 @@ class Evtx2esView(BaseView):
         )
 
     def __list_evtx_files(self, evtx_files: List[str]) -> List[Path]:
-        evtx_path_list: List[Path] = list()
+        evtx_path_list: List[Path] = []
         for evtx_file in evtx_files:
-            if Path(evtx_file).is_dir():
-                evtx_path_list.extend(Path(evtx_file).glob("**/*.evtx"))
-                evtx_path_list.extend(Path(evtx_file).glob("**/*.EVTX"))
+            p = Path(evtx_file)
+            if p.is_dir():
+                evtx_path_list.extend(f for f in p.rglob("*") if f.suffix.lower() == ".evtx")
             else:
-                evtx_path_list.append(Path(evtx_file))
+                evtx_path_list.append(p)
 
         return evtx_path_list
 
     def run(self):
-        if self.args.datasetdate is not None:
-            dataset_date = datetime.strptime(self.args.datasetdate, "%m/%d/%Y.%H:%M:%S")
-            shift = datetime.now() - dataset_date
-        else:
-            shift = "0"
-
-        # Parse tags
-        additional_tags = None
-        if self.args.tags:
-            additional_tags = [
-                tag.strip() for tag in self.args.tags.split(",") if tag.strip()
-            ]
+        shift, additional_tags = self.get_shift_and_tags()
 
         evtx_files = self.__list_evtx_files(self.args.evtx_files)
 
@@ -102,6 +86,40 @@ class Evtx2esView(BaseView):
 
 
 def entry_point():
+    import sys
+    import multiprocessing
+    
+    # Python multiprocessing spawn might pass interpreter flags (-E, -s) before the actual multiprocessing command.
+    # Nuitka compiled binaries don't consume these flags automatically, so they fall into sys.argv and crash argparse.
+    is_mp = False
+    for arg in sys.argv:
+        if arg == '--multiprocessing-fork' or 'tracker' in arg or arg == '-c':
+            is_mp = True
+            break
+            
+    if is_mp:
+        if '-c' in sys.argv:
+            idx = sys.argv.index('-c')
+            if idx + 1 < len(sys.argv) and 'multiprocessing' in sys.argv[idx + 1]:
+                exec(sys.argv[idx + 1])
+                sys.exit(0)
+        
+        for arg in sys.argv:
+            if 'resource' in arg or 'semaphore' in arg:
+                if 'tracker' in arg:
+                    import importlib
+                    tracker_module = 'resource_tracker' if 'resource' in arg else 'semaphore_tracker'
+                    tracker = importlib.import_module(f'multiprocessing.{tracker_module}')
+                    tracker.main(int(sys.argv[-1]))
+                    sys.exit(0)
+                    
+        if '--multiprocessing-fork' in sys.argv:
+            idx = sys.argv.index('--multiprocessing-fork')
+            sys.argv = [sys.argv[0]] + sys.argv[idx:]
+            multiprocessing.freeze_support()
+            sys.exit(0)
+            
+    multiprocessing.freeze_support()
     Evtx2esView().run()
 
 

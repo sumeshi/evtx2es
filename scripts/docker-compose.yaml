@@ -1,15 +1,6 @@
 version: '3.8'
 
 services:
-  dev:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    volumes:
-      - ../:/workspace:cached
-    network_mode: service:elasticsearch
-    tty: true
-
   elasticsearch:
     image: elasticsearch:9.3.1
     container_name: evtx2es-elasticsearch

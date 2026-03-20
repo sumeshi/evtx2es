@@ -24,27 +24,9 @@ class Evtx2jsonView(BaseView):
             default="",
             help="json file path to output.",
         )
-        self.parser.add_argument(
-            "--datasetdate",
-            default=None,
-            help="Date of latest record in dataset from TimeCreated record - MM/DD/YYYY.HH:MM:SS",
-        )
 
     def run(self):
-
-        # shift timestamp
-        if self.args.datasetdate is not None:
-            dataset_date = datetime.strptime(self.args.datasetdate, "%m/%d/%Y.%H:%M:%S")
-            shift = datetime.now() - dataset_date
-        else:
-            shift = "0"
-
-        # Parse tags
-        additional_tags = None
-        if self.args.tags:
-            additional_tags = [
-                tag.strip() for tag in self.args.tags.split(",") if tag.strip()
-            ]
+        shift, additional_tags = self.get_shift_and_tags()
 
         self.log(f"Converting {self.args.evtx_file}.", self.args.quiet)
 
@@ -65,6 +47,40 @@ class Evtx2jsonView(BaseView):
 
 
 def entry_point():
+    import sys
+    import multiprocessing
+    
+    # Python multiprocessing spawn might pass interpreter flags (-E, -s) before the actual multiprocessing command.
+    # Nuitka compiled binaries don't consume these flags automatically, so they fall into sys.argv and crash argparse.
+    is_mp = False
+    for arg in sys.argv:
+        if arg == '--multiprocessing-fork' or 'tracker' in arg or arg == '-c':
+            is_mp = True
+            break
+            
+    if is_mp:
+        if '-c' in sys.argv:
+            idx = sys.argv.index('-c')
+            if idx + 1 < len(sys.argv) and 'multiprocessing' in sys.argv[idx + 1]:
+                exec(sys.argv[idx + 1])
+                sys.exit(0)
+        
+        for arg in sys.argv:
+            if 'resource' in arg or 'semaphore' in arg:
+                if 'tracker' in arg:
+                    import importlib
+                    tracker_module = 'resource_tracker' if 'resource' in arg else 'semaphore_tracker'
+                    tracker = importlib.import_module(f'multiprocessing.{tracker_module}')
+                    tracker.main(int(sys.argv[-1]))
+                    sys.exit(0)
+                    
+        if '--multiprocessing-fork' in sys.argv:
+            idx = sys.argv.index('--multiprocessing-fork')
+            sys.argv = [sys.argv[0]] + sys.argv[idx:]
+            multiprocessing.freeze_support()
+            sys.exit(0)
+
+    multiprocessing.freeze_support()
     Evtx2jsonView().run()
 
 

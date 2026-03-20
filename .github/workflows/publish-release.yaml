@@ -12,7 +12,7 @@ jobs:
       version: ${{ steps.create_tag.outputs.version }}
     strategy:
       matrix:
-        python-version: ['3.11']
+        python-version: ['3.13']
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -22,51 +22,32 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       
-      - name: replace version
-        run: |
-          from pathlib import Path
-          version = [l for l in Path('pyproject.toml').read_text().splitlines() if 'version' in l][0].split(' ')[-1].strip('\"')
-          f = Path('src/evtx2es/views/BaseView.py')
-          text = f.read_text().replace("get_version('evtx2es')", f"\'{version}\'")
-          f.write_text(text)
-        shell: python
-
       - name: Install dependencies
         run: |
           pip install uv
-
-      - name: get version
-        id: get_version
-        run: |
-          version=$(cat pyproject.toml | grep version | head -1 | awk -F '"' '{print $2}')
-          echo "version=$version" >> $GITHUB_ENV
-        shell: bash
+          uv sync
 
       - name: run python
         run: |
           uv run evtx2es -h
-          uv run evtx2es -v
           uv run evtx2json -h
-          uv run evtx2json -v
       
       - name: build
         run: |
-          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2es-windows-x64-v$env:version.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
-          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2json-windows-x64-v$env:version.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
+          pip install nuitka
+          uv run python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2es.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2json.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
       
       - name: verify
         run: |
-          dist/evtx2es-windows-x64-v$version.exe -h
-          dist/evtx2es-windows-x64-v$version.exe -v
-          dist/evtx2json-windows-x64-v$version.exe -h
-          dist/evtx2json-windows-x64-v$version.exe -v
-        shell: bash
+          dist/evtx2es.exe --version
+          dist/evtx2json.exe --version
       
       - name: create tag
         id: create_tag
         if: startsWith(github.ref, 'refs/heads/master')
         run: |
-          version=$(cat pyproject.toml | grep version | head -1 | awk -F '"' '{print $2}')
+          version=$(grep '__version__' src/evtx2es/__about__.py | awk -F '"' '{print $2}')
           git tag "v$version"
           git push origin "v$version"
           echo "version=$version" >> $GITHUB_OUTPUT
@@ -74,13 +55,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
 
+      - name: rename asset
+        if: startsWith(github.ref, 'refs/heads/master')
+        run: |
+          mv dist/evtx2es.exe dist/evtx2es-windows-x64-v${{ steps.create_tag.outputs.version }}.exe
+          mv dist/evtx2json.exe dist/evtx2json-windows-x64-v${{ steps.create_tag.outputs.version }}.exe
+        shell: bash
+
       - name: create release
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/heads/master')
         with:
           tag_name: v${{ steps.create_tag.outputs.version }}
           files: |
-            dist/evtx2es-windows-x64-v${{ env.version }}.exe
-            dist/evtx2json-windows-x64-v${{ env.version }}.exe
+            dist/evtx2es-windows-x64-v${{ steps.create_tag.outputs.version }}.exe
+            dist/evtx2json-windows-x64-v${{ steps.create_tag.outputs.version }}.exe
           name: Release v${{ steps.create_tag.outputs.version }}
           body: 'This release was automatically created by GitHub Actions.'
         env:
@@ -88,12 +77,10 @@ jobs:
 
   build-linux:
     needs: build-windows
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
-        python-version: ['3.11']
-    env:
-      version: ${{ needs.build-windows.outputs.version }}
+        python-version: ['3.13']
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -103,46 +90,42 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       
-      - name: replace version
-        run: |
-          from pathlib import Path
-          version = [l for l in Path('pyproject.toml').read_text().splitlines() if 'version' in l][0].split(' ')[-1].strip('\"')
-          f = Path('src/evtx2es/views/BaseView.py')
-          text = f.read_text().replace("get_version('evtx2es')", f"\'{version}\'")
-          f.write_text(text)
-        shell: python
-
       - name: Install dependencies
         run: |
           sudo apt install patchelf
           pip install uv
+          uv sync
 
       - name: run python
         run: |
           uv run evtx2es -h
-          uv run evtx2es -v
           uv run evtx2json -h
-          uv run evtx2json -v
 
       - name: build
         run: |
           pip install nuitka
-          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2es-linux-x64-v$version --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
-          uv run python -m nuitka --standalone --onefile --follow-imports -o evtx2json-linux-x64-v$version --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2es --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2json --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
       
       - name: verify
         run: |
-          dist/evtx2es-linux-x64-v$version -h
-          dist/evtx2es-linux-x64-v$version -v
-          dist/evtx2json-linux-x64-v$version -h
-          dist/evtx2json-linux-x64-v$version -v
+          dist/evtx2es --version
+          dist/evtx2json --version
+
+      - name: rename asset
+        if: startsWith(github.ref, 'refs/heads/master')
+        run: |
+          mv dist/evtx2es dist/evtx2es-linux-x64-v${{ needs.build-windows.outputs.version }}
+          mv dist/evtx2json dist/evtx2json-linux-x64-v${{ needs.build-windows.outputs.version }}
+        shell: bash
 
       - name: upload asset to release
+        if: startsWith(github.ref, 'refs/heads/master')
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ needs.build-windows.outputs.version }}
           files: |
-            dist/evtx2es-linux-x64-v${{ env.version }}
-            dist/evtx2json-linux-x64-v${{ env.version }}
+            dist/evtx2es-linux-x64-v${{ needs.build-windows.outputs.version }}
+            dist/evtx2json-linux-x64-v${{ needs.build-windows.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -10,7 +10,7 @@ from evtx2es.models.Evtx2es import Evtx2es
 from evtx2es.models.ElasticsearchUtils import ElasticsearchUtils
 
 
-class Evtx2esPresenter(object):
+class Evtx2esPresenter:
 
     def __init__(
         self,

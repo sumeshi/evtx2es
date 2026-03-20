@@ -1,10 +1,12 @@
-FROM python:3.11.13-slim-bookworm
+FROM python:3.13.12-slim-trixie
 
 RUN apt -y update && apt upgrade -qqy && apt -y install \
     curl \
     gcc \
     git \
     fish \
+    wget \
+    ccache \
     patchelf \
     && apt clean
 

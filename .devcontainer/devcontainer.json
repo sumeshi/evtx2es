@@ -1,22 +1,22 @@
 {
     "name": "dev",
     "dockerComposeFile": "docker-compose.yaml",
+    "service": "dev",
     "remoteUser": "dev",
-	"service": "dev",
-	"workspaceFolder": "/workspace/",
+    "workspaceFolder": "/workspace",
     "postCreateCommand": "/usr/bin/fish ./.devcontainer/postCreateCommands.fish",
     "customizations": {
         "vscode": {
             "extensions": [
                 "ms-azuretools.vscode-docker",
                 "ms-python.python",
-                "ms-python.vscode-pylance"
+                "ms-python.vscode-pylance",
+                "ms-python.black-formatter"
             ],
             "settings": {
-                "python.linting.flake8Enabled": true,
-                "python.formatting.provider": "black",
                 "[python]": {
                     "editor.formatOnSave": true,
+                    "editor.defaultFormatter": "ms-python.black-formatter",
                     "editor.codeActionsOnSave": {
                         "source.organizeImports": true
                     }

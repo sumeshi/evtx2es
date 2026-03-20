@@ -7,14 +7,15 @@
 
 ![evtx2es logo](https://gist.githubusercontent.com/sumeshi/c2f430d352ae763273faadf9616a29e5/raw/1bf24feb55571bf7f0c7d8d4cb04bd0a511120f2/evtx2es.svg)
 
-A library for fast parse & import of Windows Eventlogs into Elasticsearch.
+A fast library for parsing and importing Windows Event Logs into Elasticsearch.
 
-Life is too short to process **huge Windows Eventlogs** with **pure Python**.  
-**evtx2es** uses the Rust library [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs), making it much faster than traditional tools.
+Life is too short to process **huge Windows Event Logs** using **pure Python**.  
+**evtx2es** leverages the Rust-based parser [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs), making it significantly faster than traditional tools.
+It also provides parsing capable of extracting as many records as possible from corrupted, partially overwritten, or carved `.evtx` files.
 
 ## Usage
 
-**evtx2es** can be executed from the command line or incorporated into a Python script.
+**evtx2es** can be used as a standalone command-line tool or integrated directly into your Python scripts.
 
 ```bash
 $ evtx2es /path/to/your/file.evtx
@@ -30,13 +31,13 @@ if __name__ == '__main__':
 
 ### Arguments
 
-evtx2es supports simultaneous import of multiple files.
+**evtx2es** supports importing multiple files simultaneously:
 
 ```bash
 $ evtx2es file1.evtx file2.evtx file3.evtx
 ```
 
-It also allows recursive import from the specified directory.
+You can also specify a directory to recursively import all `.evtx` files within it:
 
 ```bash
 $ tree .
@@ -50,7 +51,7 @@ evtxfiles/
       ├── file5.evtx
       └── file6.evtx
 
-$ evtx2es /evtxfiles/ # The path is recursively expanded to file1~6.evtx.
+$ evtx2es /evtxfiles/ # This recursively processes file1 through file6.
 ```
 
 ### Options
@@ -117,22 +118,20 @@ With credentials for Elastic Security:
 $ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foobar --login=elastic --pwd=******
 ```
 
-Note: The current version does not verify the certificate.
+**Note:** TLS/SSL certificate verification is currently disabled by default.
 
 
 ## Appendix
 
 ### Evtx2json
 
-An additional feature: :sushi: :sushi: :sushi:
-
-Convert Windows Event Logs to a JSON file.
+As an added bonus, **evtx2es** includes a secondary tool to convert Windows Event Logs into JSON files. :sushi: :sushi: :sushi:
 
 ```bash
 $ evtx2json /path/to/your/file.evtx /path/to/output/target.json
 ```
 
-Convert Windows Event Logs to a Python List[dict] object.
+You can also convert `.evtx` files directly into a Python `List[dict]` object:
 
 ```python
 from evtx2es import evtx2json
@@ -211,7 +210,7 @@ Using the sample evtx file of [JPCERT/CC:LogonTracer](https://github.com/JPCERTC
 
 ## Performance Evaluations (v1.8.0)
 
-evtx2es was evaluated using the sample evtx file of [JPCERT/CC:LogonTracer](https://github.com/JPCERTCC/LogonTracer) (about 30MB binary data).
+Performance was evaluated using a sample `.evtx` file from [JPCERT/CC:LogonTracer](https://github.com/JPCERTCC/LogonTracer) (approx. 30MB of binary data).
 
 ```.bash
 $ time uv run evtx2es Security.evtx 
@@ -235,7 +234,7 @@ CPU: Intel Core i5-12400F
 RAM: DDR4 32GB
 ```
 
-Performance evaluation was conducted using the provided dev container environment with Elasticsearch 9.0.2 running in Docker (Official Image).  
+The tests were conducted within the provided development container, pushing data into a local Elasticsearch 9.0.2 Docker container.  
 https://hub.docker.com/_/elasticsearch
 
 ## Installation
@@ -254,7 +253,7 @@ $ uv add evtx2es
 
 ### from GitHub Releases
 
-The version compiled into a binary using Nuitka is also available for use.
+Pre-compiled standalone binaries (built with Nuitka) are available for systems without a Python environment.
 
 ```bash
 $ chmod +x ./evtx2es
@@ -267,8 +266,8 @@ $ ./evtx2es {{options...}}
 
 ## Contributing
 
-The source code for evtx2es is hosted on GitHub. You can download, fork, and review it from this repository: https://github.com/sumeshi/evtx2es.
-Please report issues and feature requests. :sushi: :sushi: :sushi:
+The source code for **evtx2es** is hosted on GitHub at https://github.com/sumeshi/evtx2es. 
+Contributions, forks, and reviews are highly encouraged! Please feel free to open issues and submit feature requests. :sushi: :sushi: :sushi:
 
 ## Included in
 
@@ -280,7 +279,7 @@ Thank you for your interest in evtx2es!
 
 evtx2es is released under the [MIT](https://github.com/sumeshi/evtx2es/blob/master/LICENSE) License.
 
-Powered by following libraries:
+Powered by the following libraries:
 - [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs)
 - [Nuitka](https://github.com/Nuitka/Nuitka)
 

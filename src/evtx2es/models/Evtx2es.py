@@ -117,14 +117,14 @@ def _create_timestamp_field(system_time: str, shift: Union[str, datetime]) -> st
     """Create timestamp field with optional shift."""
     if shift != "0" and isinstance(shift, datetime):
         current_timestamp = datetime.strptime(
-            system_time, "%Y-%m-%d" "T" "%H:%M:%S.%fZ"
+            system_time, "%Y-%m-%dT%H:%M:%S.%fZ"
         )
         final_timestamp = (
             current_timestamp
             + timedelta(seconds=shift.seconds)
             + timedelta(days=shift.days)
         )
-        return final_timestamp.strftime("%Y-%m-%d" "T" "%H:%M:%S.%fZ")
+        return final_timestamp.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     else:
         return system_time
 
@@ -309,12 +309,12 @@ def process_by_chunk(
         List[dict]: Eventlog records list.
     """
 
-    filepath = filepath if type(filepath) is str else filepath.__next__()
-    shift = shift if type(shift) is str else shift.__next__()
+    filepath = filepath if isinstance(filepath, str) else next(filepath)
+    shift = shift if isinstance(shift, str) else next(shift)
     additional_tags = (
         additional_tags
         if isinstance(additional_tags, list)
-        else (additional_tags.__next__() if additional_tags else None)
+        else (next(additional_tags) if additional_tags else None)
     )
 
     concatenated_json: str = (
@@ -379,7 +379,7 @@ class Evtx2es(SafeMultiprocessingMixin):
                 )
                 yield list(chain.from_iterable(results.get(timeout=None)))
         else:
-            buffer: List[List[dict]] = list()
+            buffer: List[List[dict]] = []
             for records in generate_chunks(chunk_size, self.parser.records_json()):
                 if chunk_size <= len(buffer):
                     yield list(chain.from_iterable(buffer))
