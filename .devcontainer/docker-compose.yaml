@@ -11,10 +11,10 @@ services:
     tty: true
 
   elasticsearch:
-    image: elasticsearch:9.0.2
+    image: elasticsearch:9.3.1
     container_name: evtx2es-elasticsearch
     ports:
-        - "9200:9200"
+      - "9200:9200"
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -24,9 +24,9 @@ services:
         hard: -1
 
   kibana:
-    image: kibana:9.0.2
+    image: kibana:9.3.1
     container_name: evtx2es-kibana
     ports:
-        - 5601:5601
+      - 5601:5601
     environment:
       - elasticsearch.host="http://localhost:9200"
