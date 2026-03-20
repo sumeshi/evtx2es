@@ -1,0 +1,3 @@
+#!/usr/bin/env fish
+uv run python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2es --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
+uv run python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2json --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
