@@ -39,7 +39,14 @@ class SafeMultiprocessingMixin:
 
 
 def generate_chunks(chunk_size: int, iterable: Iterable) -> Generator:
-    """Generate arbitrarily sized chunks from iterable objects.
+    """Generate arbitrarily sized chunks from iterable objects, maximizing data recovery.
+
+    When dealing with EVTX files recovered via carving from unallocated space, 
+    the data is frequently incomplete, overwritten, or heavily corrupted (garbage data).
+    This function replaces `itertools.islice` with manual iteration to gracefully 
+    handle both expected parsing errors (like `RuntimeError` for bad chunk headers) 
+    and unexpected exceptions. The primary goal is to salvage as many intact 
+    records as possible without crashing the entire extraction process.
 
     Args:
         chunk_size (int): Chunk sizes.
@@ -48,11 +55,37 @@ def generate_chunks(chunk_size: int, iterable: Iterable) -> Generator:
     Yields:
         Generator: List
     """
-    i = iter(iterable)
-    piece = list(islice(i, chunk_size))
-    while piece:
-        yield piece
-        piece = list(islice(i, chunk_size))
+    iterator = iter(iterable)
+    piece = []
+
+    while True:
+        try:
+            # Extract a single record at a time to isolate parsing errors
+            item = next(iterator)
+            piece.append(item)
+
+            # Yield the chunk when it reaches the specified size
+            if len(piece) == chunk_size:
+                yield piece
+                piece = []
+
+        except StopIteration:
+            # End of the iterable reached; yield any remaining records in the buffer
+            if piece:
+                yield piece
+            break
+
+        except RuntimeError as e:
+            # Catch specific EVTX parser errors (e.g., corrupted chunk headers).
+            # Bypassing these allows us to recover subsequent valid records.
+            continue
+
+        except Exception as e:
+            # Catch-all for unexpected errors caused by heavily corrupted carved data.
+            # In forensic carving, encountering unpredictable garbage data is common.
+            # We catch these to ensure the parser survives and extracts all possible data
+            # instead of halting the entire pipeline.
+            continue
 
 
 def _parse_event_data(record: dict) -> dict:
