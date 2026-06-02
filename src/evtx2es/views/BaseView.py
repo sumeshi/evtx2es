@@ -67,6 +67,42 @@ class BaseView(metaclass=ABCMeta):
     def define_options(self):
         pass
 
+    @staticmethod
+    def run_entry_point(view_class):
+        import sys
+        import multiprocessing
+
+        is_mp = False
+        for arg in sys.argv:
+            if arg == '--multiprocessing-fork' or 'tracker' in arg or arg == '-c':
+                is_mp = True
+                break
+
+        if is_mp:
+            if '-c' in sys.argv:
+                idx = sys.argv.index('-c')
+                if idx + 1 < len(sys.argv) and 'multiprocessing' in sys.argv[idx + 1]:
+                    exec(sys.argv[idx + 1])
+                    sys.exit(0)
+
+            for arg in sys.argv:
+                if 'resource' in arg or 'semaphore' in arg:
+                    if 'tracker' in arg:
+                        import importlib
+                        tracker_module = 'resource_tracker' if 'resource' in arg else 'semaphore_tracker'
+                        tracker = importlib.import_module(f'multiprocessing.{tracker_module}')
+                        tracker.main(int(sys.argv[-1]))
+                        sys.exit(0)
+
+            if '--multiprocessing-fork' in sys.argv:
+                idx = sys.argv.index('--multiprocessing-fork')
+                sys.argv = [sys.argv[0]] + sys.argv[idx:]
+                multiprocessing.freeze_support()
+                sys.exit(0)
+
+        multiprocessing.freeze_support()
+        view_class().run()
+
     def log(self, message: str, is_quiet: bool):
         if not is_quiet:
             print(message)

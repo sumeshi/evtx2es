@@ -1,7 +1,6 @@
 # coding: utf-8
 from typing import List
 from pathlib import Path
-from datetime import datetime
 from multiprocessing import cpu_count
 
 from evtx2es.views.BaseView import BaseView
@@ -42,6 +41,11 @@ class Evtx2esView(BaseView):
         self.parser.add_argument(
             "--pwd", default="", help="Password associated with the login"
         )
+        self.parser.add_argument(
+            "--no-verify-certs",
+            action="store_true",
+            help="Disable TLS certificate verification",
+        )
 
     def __list_evtx_files(self, evtx_files: List[str]) -> List[Path]:
         evtx_path_list: List[Path] = []
@@ -50,6 +54,12 @@ class Evtx2esView(BaseView):
             if p.is_dir():
                 evtx_path_list.extend(f for f in p.rglob("*") if f.suffix.lower() == ".evtx")
             else:
+                if p.suffix.lower() != ".evtx":
+                    print(f"Warning: {evtx_file} is not a .evtx file, skipping.")
+                    continue
+                if not p.exists():
+                    print(f"Warning: {evtx_file} does not exist, skipping.")
+                    continue
                 evtx_path_list.append(p)
 
         return evtx_path_list
@@ -80,47 +90,15 @@ class Evtx2esView(BaseView):
                 chunk_size=int(self.args.size),
                 additional_tags=additional_tags,
                 logger=self.log,
+                verify_certs=not self.args.no_verify_certs,
             ).bulk_import()
 
         self.log("Import completed.", self.args.quiet)
 
 
 def entry_point():
-    import sys
-    import multiprocessing
-    
-    # Python multiprocessing spawn might pass interpreter flags (-E, -s) before the actual multiprocessing command.
-    # Nuitka compiled binaries don't consume these flags automatically, so they fall into sys.argv and crash argparse.
-    is_mp = False
-    for arg in sys.argv:
-        if arg == '--multiprocessing-fork' or 'tracker' in arg or arg == '-c':
-            is_mp = True
-            break
-            
-    if is_mp:
-        if '-c' in sys.argv:
-            idx = sys.argv.index('-c')
-            if idx + 1 < len(sys.argv) and 'multiprocessing' in sys.argv[idx + 1]:
-                exec(sys.argv[idx + 1])
-                sys.exit(0)
-        
-        for arg in sys.argv:
-            if 'resource' in arg or 'semaphore' in arg:
-                if 'tracker' in arg:
-                    import importlib
-                    tracker_module = 'resource_tracker' if 'resource' in arg else 'semaphore_tracker'
-                    tracker = importlib.import_module(f'multiprocessing.{tracker_module}')
-                    tracker.main(int(sys.argv[-1]))
-                    sys.exit(0)
-                    
-        if '--multiprocessing-fork' in sys.argv:
-            idx = sys.argv.index('--multiprocessing-fork')
-            sys.argv = [sys.argv[0]] + sys.argv[idx:]
-            multiprocessing.freeze_support()
-            sys.exit(0)
-            
-    multiprocessing.freeze_support()
-    Evtx2esView().run()
+    from evtx2es.views.BaseView import BaseView
+    BaseView.run_entry_point(Evtx2esView)
 
 
 if __name__ == "__main__":

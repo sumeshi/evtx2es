@@ -1,7 +1,7 @@
 # coding: utf-8
 import traceback
 from datetime import datetime
-from typing import List, Union, Callable, Optional
+from typing import List, Generator, Union, Callable, Optional
 from pathlib import Path
 
 from tqdm import tqdm
@@ -26,8 +26,9 @@ class Evtx2esPresenter:
         is_quiet: bool = False,
         multiprocess: bool = False,
         chunk_size: int = 500,
-        additional_tags: List[str] = None,
+        additional_tags: Optional[List[str]] = None,
         logger: Optional[Callable[[str, bool], None]] = None,
+        verify_certs: bool = True,
     ):
         self.input_path = input_path
         self.host = host
@@ -43,23 +44,25 @@ class Evtx2esPresenter:
         self.chunk_size = chunk_size
         self.additional_tags = additional_tags
         self.logger = logger
+        self.verify_certs = verify_certs
 
-    def evtx2es(self) -> List[List[dict]]:
+    def evtx2es(self) -> Generator[List[dict], None, None]:
         r = Evtx2es(self.input_path)
-        generator = (
-            r.gen_records(
-                self.shift, self.multiprocess, self.chunk_size, self.additional_tags
-            )
-            if self.is_quiet
-            else tqdm(
+        try:
+            for batch in (
                 r.gen_records(
                     self.shift, self.multiprocess, self.chunk_size, self.additional_tags
                 )
-            )
-        )
-
-        buffer: List[List[dict]] = generator
-        return buffer
+                if self.is_quiet
+                else tqdm(
+                    r.gen_records(
+                        self.shift, self.multiprocess, self.chunk_size, self.additional_tags
+                    )
+                )
+            ):
+                yield batch
+        finally:
+            r.close()
 
     def bulk_import(self):
         es = ElasticsearchUtils(
@@ -68,6 +71,7 @@ class Evtx2esPresenter:
             scheme=self.scheme,
             login=self.login,
             pwd=self.pwd,
+            verify_certs=self.verify_certs,
         )
 
         # Buffer for collecting results

@@ -23,6 +23,7 @@ def evtx2es(
     multiprocess: bool = False,
     chunk_size: int = 500,
     additional_tags: List[str] = None,
+    verify_certs: bool = True,
 ) -> None:
     """Fast import of Windows Eventlog into Elasticsearch.
     Args:
@@ -61,6 +62,9 @@ def evtx2es(
 
         additional_tags (List[str], optional):
             Additional tags to add to each record.
+
+        verify_certs (bool, optional):
+            Whether to verify TLS certificates for Elasticsearch connections.
     """
 
     Evtx2esPresenter(
@@ -77,6 +81,7 @@ def evtx2es(
         multiprocess=multiprocess,
         chunk_size=int(chunk_size),
         additional_tags=additional_tags,
+        verify_certs=verify_certs,
     ).bulk_import()
 
 
@@ -101,16 +106,19 @@ def evtx2json(
         it requires the same amount of memory as the file to be loaded.
     """
     evtx = Evtx2es(Path(input_path).resolve())
-    records: List[dict] = sum(
-        list(
-            evtx.gen_records(
-                shift=shift,
-                multiprocess=multiprocess,
-                chunk_size=chunk_size,
-                additional_tags=additional_tags,
-            )
-        ),
-        list(),
-    )
+    try:
+        records: List[dict] = sum(
+            list(
+                evtx.gen_records(
+                    shift=shift,
+                    multiprocess=multiprocess,
+                    chunk_size=chunk_size,
+                    additional_tags=additional_tags,
+                )
+            ),
+            list(),
+        )
+    finally:
+        evtx.close()
 
     return records

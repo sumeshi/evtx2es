@@ -10,14 +10,15 @@ import orjson
 
 class ElasticsearchUtils:
     def __init__(
-        self, hostname: str, port: int, scheme: str, login: str, pwd: str
+        self, hostname: str, port: int, scheme: str, login: str, pwd: str,
+        verify_certs: bool = True,
     ) -> None:
         kwargs = {
             "hosts": [f"{scheme}://{hostname}:{port}"],
-            "verify_certs": False
+            "verify_certs": verify_certs,
         }
         if login != "":
-            kwargs["http_auth"] = (login, pwd)
+            kwargs["basic_auth"] = (login, pwd)
             
         self.es = Elasticsearch(**kwargs)
 

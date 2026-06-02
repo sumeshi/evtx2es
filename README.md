@@ -5,11 +5,12 @@
 
 ![evtx2es logo](https://gist.githubusercontent.com/sumeshi/c2f430d352ae763273faadf9616a29e5/raw/1bf24feb55571bf7f0c7d8d4cb04bd0a511120f2/evtx2es.svg)
 
-A fast library for parsing and importing Windows Event Logs into Elasticsearch.
+A command-line tool and Python library for parsing Windows Event Logs and importing the results into Elasticsearch.
 
 Life is too short to process **huge Windows Event Logs** using **pure Python**.  
 **evtx2es** leverages the Rust-based parser [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs), making it significantly faster than traditional tools.
-It also provides parsing capable of extracting as many records as possible from corrupted, partially overwritten, or carved `.evtx` files.
+It can also recover as many records as possible from corrupted, partially overwritten, or carved `.evtx` files.
+
 
 ## Usage
 
@@ -22,20 +23,19 @@ $ evtx2es /path/to/your/file.evtx
 ```python
 from evtx2es import evtx2es
 
-if __name__ == '__main__':
-  filepath = '/path/to/your/file.evtx'
-  evtx2es(filepath)
+evtx2es('/path/to/your/file.evtx')
 ```
+
 
 ### Arguments
 
-**evtx2es** supports importing multiple files simultaneously:
+**evtx2es** can process multiple files at once:
 
 ```bash
 $ evtx2es file1.evtx file2.evtx file3.evtx
 ```
 
-You can also specify a directory to recursively import all `.evtx` files within it:
+evtx2es can recursively process all `.evtx` files under a specified directory:
 
 ```bash
 $ tree .
@@ -51,6 +51,7 @@ evtxfiles/
 
 $ evtx2es /evtxfiles/ # This recursively processes file1 through file6.
 ```
+
 
 ### Options
 
@@ -68,7 +69,7 @@ $ evtx2es /evtxfiles/ # This recursively processes file1 through file6.
   (default: False)
 
 --size:
-  Chunk size for processing (default: 500)
+  Number of records to process per chunk (default: 500)
 
 --host:
   Elasticsearch host address (default: localhost)
@@ -86,44 +87,48 @@ $ evtx2es /evtxfiles/ # This recursively processes file1 through file6.
   Elasticsearch Ingest Pipeline to use (default: )
 
 --datasetdate:
-  Date of the latest record in the dataset, extracted from TimeCreated field (MM/DD/YYYY.HH:MM:SS) (default: 0)
+  Date of the latest record in the dataset, extracted from the `TimeCreated` field (MM/DD/YYYY.HH:MM:SS). If omitted, timestamps are not shifted.
 
 --login:
-  The login to use if Elastic Security is enabled (default: )
+  Username for Elasticsearch authentication
 
 --pwd:
-  The password associated with the provided login (default: )
+  Password for Elasticsearch authentication
+
+--no-verify-certs:
+  Disable TLS certificate verification for Elasticsearch connections (default: False)
 ```
+
 
 ### Examples
 
 When using from the command line:
 
-```
+```bash
 $ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foobar --size=500
 ```
 
 When using from a Python script:
 
 ```py
-if __name__ == '__main__':
-    evtx2es('/path/to/your/file.evtx', host=localhost, port=9200, index='foobar', size=500)
+evtx2es("/path/to/your/file.evtx", host="localhost", port=9200, index="foobar", chunk_size=500)
 ```
 
 With credentials for Elastic Security:
 
-```
+```bash
 $ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foobar --login=elastic --pwd=******
 ```
 
-**Note:** TLS/SSL certificate verification is currently disabled by default.
+> [!WARNING]
+> TLS certificate verification is enabled by default for Elasticsearch connections. Use `--no-verify-certs` only when connecting to a trusted cluster with self-signed or otherwise unverifiable certificates.
 
 
 ## Appendix
 
-### Evtx2json
+### evtx2json
 
-As an added bonus, **evtx2es** includes a secondary tool to convert Windows Event Logs into JSON files. :sushi: :sushi: :sushi:
+**evtx2es** also includes `evtx2json`, a command-line tool for converting Windows Event Logs into JSON files. :sushi: :sushi: :sushi:
 
 ```bash
 $ evtx2json /path/to/your/file.evtx /path/to/output/target.json
@@ -134,16 +139,15 @@ You can also convert `.evtx` files directly into a Python `List[dict]` object:
 ```python
 from evtx2es import evtx2json
 
-if __name__ == '__main__':
-  filepath = '/path/to/your/file.evtx'
-  result: List[dict] = evtx2json(filepath)
+result: List[dict] = evtx2json('/path/to/your/file.evtx')
 ```
+
 
 ## Output Format Example
 
-Using the sample evtx file of [JPCERT/CC:LogonTracer](https://github.com/JPCERTCC/LogonTracer) as an example.
+The following example uses a sample `.evtx` file from [JPCERT/CC:LogonTracer](https://github.com/JPCERTCC/LogonTracer).
 
-```
+```json
 [
   {
     "@timestamp": "2016-10-06T01:47:07.509504Z",
@@ -206,11 +210,12 @@ Using the sample evtx file of [JPCERT/CC:LogonTracer](https://github.com/JPCERTC
 ]
 ```
 
-## Performance Evaluations (v1.8.0)
+
+## Performance Evaluation (v1.8.0)
 
 Performance was evaluated using a sample `.evtx` file from [JPCERT/CC:LogonTracer](https://github.com/JPCERTCC/LogonTracer) (approx. 30MB of binary data).
 
-```.bash
+```bash
 $ time uv run evtx2es Security.evtx 
 Currently Importing Security.evtx.
 1it [00:08,  8.09s/it]
@@ -224,6 +229,7 @@ Executed in    8.60 secs    fish           external
    sys time    0.40 secs    0.00 micros    0.40 secs
 ```
 
+
 ### Running Environment
 
 ```
@@ -232,26 +238,26 @@ CPU: Intel Core i5-12400F
 RAM: DDR4 32GB
 ```
 
-The tests were conducted within the provided development container, pushing data into a local Elasticsearch 9.0.2 Docker container.  
-https://hub.docker.com/_/elasticsearch
+The tests were conducted within the provided development container, pushing data into a local [Elasticsearch 9.0.2 Docker container](https://hub.docker.com/_/elasticsearch).
+
 
 ## Installation
 
-### from PyPI
+### From PyPI
 
-```
+```bash
 $ pip install evtx2es
 ```
 
-### with uv
+### With uv
 
-```
+```bash
 $ uv add evtx2es
 ```
 
-### from GitHub Releases
+### From GitHub Releases
 
-Pre-compiled standalone binaries (built with Nuitka) are available for systems without a Python environment.
+Standalone binaries built with Nuitka are available from GitHub Releases for systems without a Python environment.
 
 ```bash
 $ chmod +x ./evtx2es
@@ -264,21 +270,55 @@ $ ./evtx2es {{options...}}
 
 ## Contributing
 
-The source code for **evtx2es** is hosted on GitHub at https://github.com/sumeshi/evtx2es. 
-Contributions, forks, and reviews are highly encouraged! Please feel free to open issues and submit feature requests. :sushi: :sushi: :sushi:
+The source code for **evtx2es** is hosted on GitHub: https://github.com/sumeshi/evtx2es.
+Please report issues and feature requests. :sushi: :sushi: :sushi:
+
 
 ## Included in
 
-- [Tsurugi Linux [Lab] 2022 - 2024](https://tsurugi-linux.org/) - DFIR Linux distribution
+- [Tsurugi Linux [Lab]](https://tsurugi-linux.org/) — included in releases from 2022 to 2026
+- [Drift Linux Fast/Fast XS](https://www.driftlinux.org/) — included in 2026 releases
 
 Thank you for your interest in evtx2es!
 
+
 ## License
 
-evtx2es is released under the [MIT](https://github.com/sumeshi/evtx2es/blob/master/LICENSE) License.
+Released under the [MIT](LICENSE) License.
 
-Powered by the following libraries:
-- [pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs)
-- [Nuitka](https://github.com/Nuitka/Nuitka)
 
-Inspired by [EvtxtoElk](https://github.com/dgunter/evtxtoelk).
+## Third-party licenses
+
+The standalone binaries distributed via GitHub Releases may bundle the following third-party libraries.
+These libraries remain under their original licenses.
+
+### Apache-2.0
+
+- [elasticsearch-py / elasticsearch](https://github.com/elastic/elasticsearch-py) — licensed under the Apache License 2.0.
+  - Bundled version: `elasticsearch==9.4.1`
+  - License text: https://github.com/elastic/elasticsearch-py/blob/main/LICENSE
+
+### MIT
+
+- [evtx / pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs) — licensed under the MIT License.
+  - Bundled version: `evtx==0.11.1`
+  - License text: https://github.com/omerbenamram/pyevtx-rs/blob/master/pyproject.toml
+
+- [urllib3](https://github.com/urllib3/urllib3) — licensed under the MIT License.
+  - Bundled version: `urllib3==2.6.3`
+  - License text: https://github.com/urllib3/urllib3/blob/main/LICENSE.txt
+
+### Apache-2.0 OR MIT, with MPL-2.0 components
+
+- [orjson](https://github.com/ijl/orjson) — licensed under Apache-2.0 OR MIT, and contains source code licensed under MPL-2.0.
+  - Bundled version: `orjson==3.11.9`
+  - License text:
+    - https://github.com/ijl/orjson/blob/master/LICENSE-APACHE
+    - https://github.com/ijl/orjson/blob/master/LICENSE-MIT
+    - https://github.com/ijl/orjson/blob/master/LICENSE-MPL-2.0
+
+### MIT and MPL-2.0
+
+- [tqdm](https://github.com/tqdm/tqdm) — licensed under MIT, with MPL-2.0-covered files/components.
+  - Bundled version: `tqdm==4.67.3`
+  - License text: https://github.com/tqdm/tqdm/blob/master/LICENCE

@@ -2,7 +2,7 @@
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Optional
 
 import orjson
 from evtx2es.models.Evtx2es import Evtx2es
@@ -18,7 +18,7 @@ class Evtx2jsonPresenter:
         is_quiet: bool = False,
         multiprocess: bool = False,
         chunk_size: int = 500,
-        additional_tags: List[str] = None,
+        additional_tags: Optional[List[str]] = None,
     ):
         self.input_path = Path(input_path).resolve()
         self.output_path = (
@@ -34,20 +34,23 @@ class Evtx2jsonPresenter:
 
     def evtx2json(self) -> List[dict]:
         r = Evtx2es(self.input_path)
-        generator = (
-            r.gen_records(
-                self.shift, self.multiprocess, self.chunk_size, self.additional_tags
-            )
-            if self.is_quiet
-            else tqdm(
+        try:
+            generator = (
                 r.gen_records(
                     self.shift, self.multiprocess, self.chunk_size, self.additional_tags
                 )
+                if self.is_quiet
+                else tqdm(
+                    r.gen_records(
+                        self.shift, self.multiprocess, self.chunk_size, self.additional_tags
+                    )
+                )
             )
-        )
 
-        buffer: List[dict] = list(chain.from_iterable(generator))
-        return buffer
+            buffer: List[dict] = list(chain.from_iterable(generator))
+            return buffer
+        finally:
+            r.close()
 
     def export_json(self):
         self.output_path.write_text(
