@@ -108,3 +108,5 @@ venv.bak/
 *.evtx
 
 !.devcontainer/devcontainer.json
+
+TASKS.md

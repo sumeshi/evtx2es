@@ -1,9 +1,7 @@
 # evtx2es
 
 [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
-[![PyPI version](https://badge.fury.io/py/evtx2es.svg)](https://badge.fury.io/py/evtx2es)
-[![Python Versions](https://img.shields.io/pypi/pyversions/evtx2es.svg)](https://pypi.org/project/evtx2es/)
-[![pytest](https://github.com/sumeshi/evtx2es/actions/workflows/test.yaml/badge.svg)](https://github.com/sumeshi/evtx2es/actions/workflows/test.yaml)
+[![PyPI Version](https://img.shields.io/pypi/v/evtx2es)](https://pypi.org/project/evtx2es/)
 
 ![evtx2es logo](https://gist.githubusercontent.com/sumeshi/c2f430d352ae763273faadf9616a29e5/raw/1bf24feb55571bf7f0c7d8d4cb04bd0a511120f2/evtx2es.svg)
 
