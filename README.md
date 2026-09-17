@@ -65,7 +65,7 @@ $ evtx2es /evtxfiles/ # This recursively processes file1 through file6.
   (default: False)
 
 --multiprocess, -m:
-  Enable multiprocessing for faster execution
+  Enable multiprocessing for faster processing.
   (default: False)
 
 --size:
@@ -84,10 +84,11 @@ $ evtx2es /evtxfiles/ # This recursively processes file1 through file6.
   Protocol scheme to use (http or https) (default: http)
 
 --pipeline:
-  Elasticsearch Ingest Pipeline to use (default: )
+  Elasticsearch ingest pipeline to use (default: )
 
 --datasetdate:
-  Date of the latest record in the dataset, extracted from the `TimeCreated` field (MM/DD/YYYY.HH:MM:SS). If omitted, timestamps are not shifted.
+  Shift timestamps based on the latest record's `TimeCreated` value
+  (MM/DD/YYYY.HH:MM:SS). If omitted, timestamps are not shifted.
 
 --login:
   Username for Elasticsearch authentication
@@ -96,7 +97,10 @@ $ evtx2es /evtxfiles/ # This recursively processes file1 through file6.
   Password for Elasticsearch authentication
 
 --no-verify-certs:
-  Disable TLS certificate verification for Elasticsearch connections (default: False)
+  Disable TLS certificate verification (default: False)
+
+--ca-certs:
+  Path to a CA certificate bundle for TLS verification (default: None)
 ```
 
 
@@ -114,14 +118,17 @@ When using from a Python script:
 evtx2es("/path/to/your/file.evtx", host="localhost", port=9200, index="foobar", chunk_size=500)
 ```
 
-With credentials for Elastic Security:
+With Elasticsearch authentication:
 
 ```bash
 $ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foobar --login=elastic --pwd=******
 ```
 
 > [!WARNING]
-> TLS certificate verification is enabled by default for Elasticsearch connections. Use `--no-verify-certs` only when connecting to a trusted cluster with self-signed or otherwise unverifiable certificates.
+> TLS certificate verification is enabled by default. Use `--no-verify-certs` only
+> when connecting to a trusted cluster with a self-signed or otherwise
+> unverifiable certificate. Use `--ca-certs /path/to/ca.pem` to provide a
+> private CA bundle while keeping verification enabled.
 
 
 ## Appendix
@@ -134,12 +141,20 @@ $ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foobar --
 $ evtx2json /path/to/your/file.evtx /path/to/output/target.json
 ```
 
-You can also convert `.evtx` files directly into a Python `List[dict]` object:
+`evtx2json` also supports line-delimited output. `--format jsonl` (or `ndjson`)
+writes one record per line without holding the entire dataset in memory. When
+no output path is specified, the default extension is `.jsonl`:
+
+```bash
+$ evtx2json /path/to/your/file.evtx --format jsonl
+```
+
+You can also convert `.evtx` files directly into a Python `list[dict]`:
 
 ```python
 from evtx2es import evtx2json
 
-result: List[dict] = evtx2json('/path/to/your/file.evtx')
+result: list[dict] = evtx2json('/path/to/your/file.evtx')
 ```
 
 
@@ -216,12 +231,12 @@ The following example uses a sample `.evtx` file from [JPCERT/CC:LogonTracer](ht
 Performance was evaluated using a sample `.evtx` file from [JPCERT/CC:LogonTracer](https://github.com/JPCERTCC/LogonTracer) (approx. 30MB of binary data).
 
 ```bash
-$ time uv run evtx2es Security.evtx 
-Currently Importing Security.evtx.
+$ time uv run evtx2es Security.evtx
+Importing Security.evtx...
 1it [00:08,  8.09s/it]
 Bulk import completed: 1 batches processed
 Successfully indexed: 62031 documents
-Import completed.
+Import completed successfully.
 
 ________________________________________________________
 Executed in    8.60 secs    fish           external

@@ -14,14 +14,21 @@ class Evtx2jsonView(BaseView):
 
     def define_options(self):
         self.parser.add_argument(
-            "evtx_file", type=str, help="Windows Eventlog file to input."
+            "--format", choices=("json", "jsonl", "ndjson"), default="json",
+            help=(
+                "Output format (default: json). "
+                "JSONL/NDJSON writes one record per line."
+            ),
+        )
+        self.parser.add_argument(
+            "evtx_file", type=str, help="Input Windows Event Log file."
         )
         self.parser.add_argument(
             "--output-file",
             "-o",
             type=str,
             default="",
-            help="json file path to output.",
+            help="Output file path.",
         )
 
     def run(self):
@@ -30,7 +37,7 @@ class Evtx2jsonView(BaseView):
         self.log(f"Converting {self.args.evtx_file}.", self.args.quiet)
 
         if self.args.multiprocess:
-            self.log(f"Multi-Process: {cpu_count()}", self.args.quiet)
+            self.log(f"Multiprocessing enabled ({cpu_count()} workers).", self.args.quiet)
 
         Evtx2jsonPresenter(
             input_path=self.args.evtx_file,
@@ -40,9 +47,10 @@ class Evtx2jsonView(BaseView):
             multiprocess=self.args.multiprocess,
             chunk_size=int(self.args.size),
             additional_tags=additional_tags,
+            output_format=self.args.format,
         ).export_json()
 
-        self.log("Converted.", self.args.quiet)
+        self.log("Conversion completed successfully.", self.args.quiet)
 
 
 def entry_point():

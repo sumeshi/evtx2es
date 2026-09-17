@@ -6,7 +6,7 @@ from urllib import request
 import pytest
 
 
-@pytest.fixture(scope='session', autouse=True)
+@pytest.fixture(scope='session', autouse=False)
 def prepare_eventlog():
     # setup
     ## download eventlog sample

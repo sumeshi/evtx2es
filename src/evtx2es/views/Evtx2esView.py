@@ -16,35 +16,47 @@ class Evtx2esView(BaseView):
 
     def define_options(self):
         self.parser.add_argument(
+            "--ca-certs",
+            default=None,
+            help="Path to a CA certificate bundle for TLS verification.",
+        )
+        self.parser.add_argument(
             "evtx_files",
             nargs="+",
             type=str,
-            help="Windows Eventlog files or directories containing them. (Files must have a '.evtx' or '.EVTX' extension)",
+            help=(
+                "Input Windows Event Log files or directories. "
+                "Files must have a .evtx extension."
+            ),
         )
 
         self.parser.add_argument(
-            "--host", default="localhost", help="ElasticSearch host"
+            "--host", default="localhost", help="Elasticsearch host."
         )
         self.parser.add_argument(
-            "--port", default=9200, help="ElasticSearch port number"
+            "--port", default=9200, type=int, help="Elasticsearch port."
         )
-        self.parser.add_argument("--index", default="evtx2es", help="Index name")
+        self.parser.add_argument("--index", default="evtx2es", help="Elasticsearch index name.")
         self.parser.add_argument(
-            "--scheme", default="http", help="Scheme to use (http, https)"
-        )
-        self.parser.add_argument(
-            "--pipeline", default="", help="Ingest pipeline to use"
+            "--scheme", default="http", help="Connection scheme (http or https)."
         )
         self.parser.add_argument(
-            "--login", default="", help="Login to use to connect to Elastic database"
+            "--pipeline", default="", help="Elasticsearch ingest pipeline to use."
         )
         self.parser.add_argument(
-            "--pwd", default="", help="Password associated with the login"
+            "--login",
+            default="",
+            help="Username for Elasticsearch authentication.",
+        )
+        self.parser.add_argument(
+            "--pwd",
+            default="",
+            help="Password for Elasticsearch authentication.",
         )
         self.parser.add_argument(
             "--no-verify-certs",
             action="store_true",
-            help="Disable TLS certificate verification",
+            help="Disable TLS certificate verification.",
         )
 
     def __list_evtx_files(self, evtx_files: List[str]) -> List[Path]:
@@ -55,10 +67,10 @@ class Evtx2esView(BaseView):
                 evtx_path_list.extend(f for f in p.rglob("*") if f.suffix.lower() == ".evtx")
             else:
                 if p.suffix.lower() != ".evtx":
-                    print(f"Warning: {evtx_file} is not a .evtx file, skipping.")
+                    print(f"Warning: {evtx_file} is not an EVTX file; skipping.")
                     continue
                 if not p.exists():
-                    print(f"Warning: {evtx_file} does not exist, skipping.")
+                    print(f"Warning: {evtx_file} does not exist; skipping.")
                     continue
                 evtx_path_list.append(p)
 
@@ -68,17 +80,21 @@ class Evtx2esView(BaseView):
         shift, additional_tags = self.get_shift_and_tags()
 
         evtx_files = self.__list_evtx_files(self.args.evtx_files)
+        if not evtx_files:
+            self.log("Error: no EVTX files found.", self.args.quiet)
+            raise SystemExit(1)
 
         if self.args.multiprocess:
-            self.log(f"Multi-Process: {cpu_count()}", self.args.quiet)
+            self.log(f"Multiprocessing enabled ({cpu_count()} workers).", self.args.quiet)
 
         for evtx_file in evtx_files:
-            self.log(f"Currently Importing {evtx_file}.", self.args.quiet)
+            self.log(f"Importing {evtx_file}...", self.args.quiet)
 
             Evtx2esPresenter(
                 input_path=evtx_file,
                 host=self.args.host,
-                port=int(self.args.port),
+                ca_certs=self.args.ca_certs,
+                port=self.args.port,
                 index=self.args.index,
                 scheme=self.args.scheme,
                 pipeline=self.args.pipeline,
@@ -93,7 +109,7 @@ class Evtx2esView(BaseView):
                 verify_certs=not self.args.no_verify_certs,
             ).bulk_import()
 
-        self.log("Import completed.", self.args.quiet)
+        self.log("Import completed successfully.", self.args.quiet)
 
 
 def entry_point():

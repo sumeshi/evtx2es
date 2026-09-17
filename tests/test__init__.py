@@ -22,7 +22,7 @@ def test__evtx2es_help(monkeypatch):
         with monkeypatch.context() as m:
             m.setattr("sys.argv", argv)
             e2e()
-        assert exited.value.code == 0
+    assert exited.value.code == 0
 
 def test__evtx2es_version(monkeypatch):
     argv = ["evtx2es", "-v"]
@@ -30,7 +30,7 @@ def test__evtx2es_version(monkeypatch):
         with monkeypatch.context() as m:
             m.setattr("sys.argv", argv)
             e2e()
-        assert exited.value.code == 0
+    assert exited.value.code == 0
 
 def test__evtx2json_help(monkeypatch):
     argv = ["evtx2json", "-h"]
@@ -38,7 +38,7 @@ def test__evtx2json_help(monkeypatch):
         with monkeypatch.context() as m:
             m.setattr("sys.argv", argv)
             e2j()
-        assert exited.value.code == 0
+    assert exited.value.code == 0
 
 def test__evtx2json_version(monkeypatch):
     argv = ["evtx2json", "-v"]
@@ -46,10 +46,11 @@ def test__evtx2json_version(monkeypatch):
         with monkeypatch.context() as m:
             m.setattr("sys.argv", argv)
             e2j()
-        assert exited.value.code == 0
+    assert exited.value.code == 0
 
 
 # behavior test cases 
+@pytest.mark.usefixtures("prepare_eventlog")
 def test__evtx2json_convert(monkeypatch):
     path = 'tests/cache/Security.json'
     argv = ["evtx2json", "-o", path, "tests/cache/Security.evtx"]
@@ -58,6 +59,7 @@ def test__evtx2json_convert(monkeypatch):
         e2j()
     assert get_json_length(Path(path)) == 62031
 
+@pytest.mark.usefixtures("prepare_eventlog")
 def test__evtx2json_convert_multiprocessing(monkeypatch):
     path = 'tests/cache/Security-m.json'
     argv = ["evtx2json", "-o", path, "-m", "tests/cache/Security.evtx"]
@@ -67,6 +69,7 @@ def test__evtx2json_convert_multiprocessing(monkeypatch):
     assert get_json_length(Path(path)) == 62031
 
 
+@pytest.mark.usefixtures("prepare_eventlog")
 def test__evtx2json_multiprocessing_keeps_record_order():
     records = evtx2es_package.evtx2json(
         "tests/cache/Security.evtx", multiprocess=False

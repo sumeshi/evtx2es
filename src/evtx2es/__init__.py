@@ -25,10 +25,10 @@ def evtx2es(
     additional_tags: List[str] = None,
     verify_certs: bool = True,
 ) -> None:
-    """Fast import of Windows Eventlog into Elasticsearch.
+    """Fast import of Windows Event Logs into Elasticsearch.
     Args:
         input_path (str):
-            Windows Eventlogs to import into Elasticsearch.
+            Windows Event Logs to import into Elasticsearch.
 
         host (str, optional):
             Elasticsearch host address. Defaults to "localhost".
@@ -92,10 +92,10 @@ def evtx2json(
     chunk_size: int = 500,
     additional_tags: List[str] = None,
 ) -> List[dict]:
-    """Convert Windows Eventlog to List[dict].
+    """Convert a Windows Event Log file to a list of dictionaries.
 
     Args:
-        input_path (str): Input Eventlog file.
+        input_path (str): Input Event Log file.
         shift (Union[str, datetime]): Timestamp shift value. Defaults to '0'.
         multiprocess (bool): Flag to run multiprocessing.
         chunk_size (int): Size of the chunk to be processed for each process.

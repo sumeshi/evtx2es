@@ -163,7 +163,7 @@ def format_record(
     shift: Union[str, datetime],
     additional_tags: Optional[List[str]] = None,
 ) -> dict:
-    """Format Eventlog record into structured JSON.
+    """Format an Event Log record as structured JSON.
 
     Args:
         record (dict): Raw eventlog record with 'data' field containing JSON string.
@@ -294,13 +294,13 @@ def process_by_chunk(
     """Perform formatting for each chunk. (for efficiency)
 
     Args:
-        records (List[str]): chunk of Eventlog records(json).
+        records (List[str]): A chunk of Event Log records in JSON form.
         filepath (List[str]): list with 1 element.
         shift (List[Union[str, datetime]]): list with 1 element
         additional_tags (List[str], optional): Additional tags to add to each record.
 
     Yields:
-        List[dict]: Eventlog records list.
+        List[dict]: A list of formatted Event Log records.
     """
 
     # Accept both raw values (multiprocess path) and generators (single-process path)
@@ -344,7 +344,7 @@ class Evtx2es(SafeMultiprocessingMixin):
         chunk_size: int,
         additional_tags: Optional[List[str]] = None,
     ) -> Generator:
-        """Generates the formatted Eventlog records chunks.
+        """Generate chunks of formatted Event Log records.
 
         Args:
             shift (Union[str, datetime]): Timestamp shift value.
