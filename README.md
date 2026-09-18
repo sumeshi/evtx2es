@@ -304,6 +304,14 @@ Released under the [MIT](LICENSE) License.
 
 ## Third-party licenses
 
+Standalone releases are ZIP archives containing both commands and `LICENSES.txt`
+with project, runtime dependency and Python license notices. Keep the notices
+with the executables when redistributing them.
+
+For the parser binding, which declares MIT but supplies no license file, the
+archive includes the standard MIT text and upstream attribution. See
+[.github/LICENSE-NOTES.md](.github/LICENSE-NOTES.md) for provenance.
+
 The standalone binaries distributed via GitHub Releases may bundle the following third-party libraries.
 These libraries remain under their original licenses.
 

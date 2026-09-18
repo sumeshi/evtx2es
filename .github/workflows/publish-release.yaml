@@ -32,6 +32,9 @@ jobs:
           uv run evtx2es -h
           uv run evtx2json -h
       
+      - name: Collect runtime licenses
+        run: uv run python .github/collect_runtime_licenses.py dist/LICENSES.txt
+
       - name: build
         run: |
           pip install nuitka
@@ -58,8 +61,12 @@ jobs:
       - name: rename asset
         if: startsWith(github.ref, 'refs/heads/master')
         run: |
-          mv dist/evtx2es.exe dist/evtx2es-windows-x64-v${{ steps.create_tag.outputs.version }}.exe
-          mv dist/evtx2json.exe dist/evtx2json-windows-x64-v${{ steps.create_tag.outputs.version }}.exe
+          bundle="dist/evtx2es-windows-x64-v${{ steps.create_tag.outputs.version }}"
+          mkdir -p "$bundle"
+          mv dist/evtx2es.exe "$bundle/evtx2es.exe"
+          mv dist/evtx2json.exe "$bundle/evtx2json.exe"
+          cp dist/LICENSES.txt "$bundle/LICENSES.txt"
+          python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
         shell: bash
 
       - name: create release
@@ -68,8 +75,7 @@ jobs:
         with:
           tag_name: v${{ steps.create_tag.outputs.version }}
           files: |
-            dist/evtx2es-windows-x64-v${{ steps.create_tag.outputs.version }}.exe
-            dist/evtx2json-windows-x64-v${{ steps.create_tag.outputs.version }}.exe
+            dist/evtx2es-windows-x64-v${{ steps.create_tag.outputs.version }}.zip
           name: Release v${{ steps.create_tag.outputs.version }}
           body: 'This release was automatically created by GitHub Actions.'
         env:
@@ -101,6 +107,9 @@ jobs:
           uv run evtx2es -h
           uv run evtx2json -h
 
+      - name: Collect runtime licenses
+        run: uv run python .github/collect_runtime_licenses.py dist/LICENSES.txt
+
       - name: build
         run: |
           pip install nuitka
@@ -115,8 +124,12 @@ jobs:
       - name: rename asset
         if: startsWith(github.ref, 'refs/heads/master')
         run: |
-          mv dist/evtx2es dist/evtx2es-linux-x64-v${{ needs.build-windows.outputs.version }}
-          mv dist/evtx2json dist/evtx2json-linux-x64-v${{ needs.build-windows.outputs.version }}
+          bundle="dist/evtx2es-linux-x64-v${{ needs.build-windows.outputs.version }}"
+          mkdir -p "$bundle"
+          mv dist/evtx2es "$bundle/evtx2es"
+          mv dist/evtx2json "$bundle/evtx2json"
+          cp dist/LICENSES.txt "$bundle/LICENSES.txt"
+          python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
         shell: bash
 
       - name: upload asset to release
@@ -125,7 +138,6 @@ jobs:
         with:
           tag_name: v${{ needs.build-windows.outputs.version }}
           files: |
-            dist/evtx2es-linux-x64-v${{ needs.build-windows.outputs.version }}
-            dist/evtx2json-linux-x64-v${{ needs.build-windows.outputs.version }}
+            dist/evtx2es-linux-x64-v${{ needs.build-windows.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
