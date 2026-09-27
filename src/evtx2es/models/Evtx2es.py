@@ -139,6 +139,9 @@ def _create_timestamp_field(system_time: str, shift: Union[str, datetime]) -> st
 
 def _normalize_field_value(key: str, value) -> Any:
     """Normalize specific field values for ProcessId and numeric ranges."""
+    if key == "Reason":
+        return str(value)
+
     # Normalize ProcessId fields
     if key == "ProcessId" and isinstance(value, str):
         if value.startswith("0x"):
