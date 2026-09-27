@@ -81,8 +81,24 @@ class Evtx2esPresenter:
                 total_success += success
                 batch_count += 1
                 if failed:
+                    details = []
+                    for item in failed[:3]:
+                        for operation, result in item.items():
+                            if not isinstance(result, dict):
+                                continue
+                            error = result.get("error", {})
+                            if not isinstance(error, dict):
+                                error = {"reason": str(error)}
+                            details.append(
+                                f"{operation} id={result.get('_id', '?')} "
+                                f"status={result.get('status', '?')} "
+                                f"{error.get('type', 'error')}: "
+                                f"{str(error.get('reason', 'unknown'))[:500]}"
+                            )
                     raise RuntimeError(
-                        f"Elasticsearch failed to index {len(failed)} document(s)"
+                        f"Elasticsearch failed to index {len(failed)} document(s); "
+                        f"{total_success} indexed before stopping. "
+                        + "; ".join(details)
                     )
         finally:
             try:

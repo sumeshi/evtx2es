@@ -5,9 +5,15 @@ from typing import List, Generator, Iterable, Union, Any, Optional
 import multiprocessing as mp
 import sys
 import os
+from collections import deque
+import logging
 
 import orjson
 from evtx import PyEvtxParser
+
+
+MAX_CONSECUTIVE_PARSE_ERRORS = 100
+logger = logging.getLogger(__name__)
 
 
 class SafeMultiprocessingMixin:
@@ -39,12 +45,8 @@ class SafeMultiprocessingMixin:
 def generate_chunks(chunk_size: int, iterable: Iterable) -> Generator:
     """Generate arbitrarily sized chunks from iterable objects, maximizing data recovery.
 
-    When dealing with EVTX files recovered via carving from unallocated space, 
-    the data is frequently incomplete, overwritten, or heavily corrupted (garbage data).
-    This function replaces `itertools.islice` with manual iteration to gracefully 
-    handle both expected parsing errors (like `RuntimeError` for bad chunk headers) 
-    and unexpected exceptions. The primary goal is to salvage as many intact 
-    records as possible without crashing the entire extraction process.
+    Parser errors are skipped to salvage later records, but repeated errors without
+    a successful record eventually raise instead of looping forever.
 
     Args:
         chunk_size (int): Chunk sizes.
@@ -55,35 +57,46 @@ def generate_chunks(chunk_size: int, iterable: Iterable) -> Generator:
     """
     iterator = iter(iterable)
     piece = []
+    consecutive_errors = 0
+    skipped_errors = 0
 
-    while True:
-        try:
-            # Extract a single record at a time to isolate parsing errors
-            item = next(iterator)
-            piece.append(item)
+    try:
+        while True:
+            try:
+                # Extract a single record at a time to isolate parsing errors
+                item = next(iterator)
+                consecutive_errors = 0
+                piece.append(item)
 
-            # Yield the chunk when it reaches the specified size
-            if len(piece) == chunk_size:
-                yield piece
-                piece = []
+                # Yield the chunk when it reaches the specified size
+                if len(piece) == chunk_size:
+                    yield piece
+                    piece = []
 
-        except StopIteration:
-            # End of the iterable reached; yield any remaining records in the buffer
-            if piece:
-                yield piece
-            break
+            except StopIteration:
+                # End of the iterable reached; yield remaining buffered records
+                if piece:
+                    yield piece
+                break
 
-        except RuntimeError:
-            # Catch specific EVTX parser errors (e.g., corrupted chunk headers).
-            # Bypassing these allows us to recover subsequent valid records.
-            continue
+            except Exception as exc:
+                consecutive_errors += 1
+                skipped_errors += 1
+                if consecutive_errors >= MAX_CONSECUTIVE_PARSE_ERRORS:
+                    raise RuntimeError(
+                        "EVTX parser failed repeatedly without yielding "
+                        "a record "
+                        f"({consecutive_errors} consecutive errors)"
+                    ) from exc
 
-        except Exception:
-            # Catch-all for unexpected errors caused by heavily corrupted carved data.
-            # In forensic carving, encountering unpredictable garbage data is common.
-            # We catch these to ensure the parser survives and extracts all possible data
-            # instead of halting the entire pipeline.
-            continue
+                # Skip transient errors to keep any later valid records.
+                continue
+    finally:
+        if skipped_errors:
+            logger.warning(
+                "Skipped %d EVTX parser error(s) while recovering records",
+                skipped_errors,
+            )
 
 
 def _parse_event_data(record: dict) -> dict:
@@ -96,7 +109,8 @@ def _parse_event_data(record: dict) -> dict:
     if isinstance(system.get("EventID"), dict):
         system["EventID"] = system["EventID"].get("#text")
 
-    # Clear Status field in EventData if present
+    # Keep the existing Status behavior until mixed value shapes are checked
+    # against the Elasticsearch mapping.
     try:
         if "EventData" in event and event["EventData"] is not None and "Status" in event["EventData"]:
             event["EventData"]["Status"] = None
@@ -367,16 +381,25 @@ class Evtx2es(SafeMultiprocessingMixin):
 
         if multiprocess:
             ctx = self.get_multiprocessing_context()
-            with ctx.Pool(self.get_cpu_count()) as pool:
-                yield from pool.imap(
-                    _mp_worker,
-                    (
-                        (c, str(self.path), shift, additional_tags)
-                        for c in generate_chunks(
-                            chunk_size, self.parser.records_json()
+            worker_count = max(1, self.get_cpu_count())
+            with ctx.Pool(worker_count) as pool:
+                pending = deque()
+                max_pending = worker_count * 2
+                # Consume the PyO3-backed iterator here, on the caller thread. Only
+                # materialized Python chunks cross into multiprocessing workers.
+                for chunk in generate_chunks(
+                    chunk_size, self.parser.records_json()
+                ):
+                    pending.append(
+                        pool.apply_async(
+                            _mp_worker,
+                            ((chunk, str(self.path), shift, additional_tags),),
                         )
-                    ),
-                )
+                    )
+                    if len(pending) >= max_pending:
+                        yield pending.popleft().get()
+                while pending:
+                    yield pending.popleft().get()
         else:
             for records in generate_chunks(chunk_size, self.parser.records_json()):
                 yield process_by_chunk(records, gen_path, gen_shift, gen_tags)

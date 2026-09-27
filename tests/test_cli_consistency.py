@@ -5,6 +5,17 @@ from pathlib import Path
 import pytest
 
 from evtx2es.views.Evtx2esView import Evtx2esView
+from evtx2es.views.BaseView import BaseView
+
+
+def test_multiprocessing_helper_rejects_arbitrary_code(tmp_path):
+    marker = tmp_path / "executed"
+    command = (
+        "from multiprocessing.spawn import spawn_main\n"
+        f"open({str(marker)!r}, 'w').close()"
+    )
+    assert BaseView._dispatch_python_command(command) is False
+    assert not marker.exists()
 
 
 def make_view(argv):

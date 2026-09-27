@@ -17,12 +17,20 @@ def test_bulk_failures_propagate_and_close(monkeypatch, failure):
     monkeypatch.setattr(presenter, "evtx2es", chunks)
     client = MagicMock()
     if failure == "partial":
-        client.bulk_indice.return_value = (0, [{"error": "rejected"}])
+        client.bulk_indice.return_value = (
+            0,
+            [{"index": {"_id": "bad-id", "status": 400,
+                        "error": {"type": "mapper_parsing_exception",
+                                  "reason": "field type conflict"}}}],
+        )
     else:
         client.bulk_indice.side_effect = RuntimeError("transport failed")
     monkeypatch.setattr(module, "ElasticsearchUtils", lambda **kwargs: client)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError) as error:
         presenter.bulk_import()
+    if failure == "partial":
+        assert "bad-id" in str(error.value)
+        assert "field type conflict" in str(error.value)
     client.close.assert_called_once()
     assert state == ["closed"]
 
