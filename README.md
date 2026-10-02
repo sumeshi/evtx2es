@@ -90,6 +90,11 @@ $ evtx2es /evtxfiles/ # This recursively processes file1 through file6.
   Shift timestamps based on the latest record's `TimeCreated` value
   (MM/DD/YYYY.HH:MM:SS). If omitted, timestamps are not shifted.
 
+--tags:
+  Comma-separated tags to add to each record (default: no additional tags).
+  Whitespace and empty tags are removed; duplicates are omitted with `eventlog`
+  first.
+
 --login:
   Username for Elasticsearch authentication
 

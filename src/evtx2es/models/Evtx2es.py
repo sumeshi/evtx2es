@@ -1,7 +1,8 @@
 # coding: utf-8
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Generator, Iterable, Union, Any, Optional
+from typing import List, Generator, Iterable, Union, Any, Optional, Sequence
+from collections.abc import Generator as GeneratorABC
 import multiprocessing as mp
 import sys
 import os
@@ -14,6 +15,24 @@ from evtx import PyEvtxParser
 
 MAX_CONSECUTIVE_PARSE_ERRORS = 100
 logger = logging.getLogger(__name__)
+
+
+def normalize_tags(
+    tags: Union[str, Sequence[str], None], builtin_tag: str = "eventlog"
+) -> List[str]:
+    """Normalize comma-separated strings or tag sequences, preserving order."""
+    if tags is None:
+        user_tags = []
+    elif isinstance(tags, str):
+        user_tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
+    else:
+        user_tags = [tag.strip() for tag in tags if tag.strip()]
+
+    result = []
+    for tag in [builtin_tag, *user_tags]:
+        if tag not in result:
+            result.append(tag)
+    return result
 
 
 class SafeMultiprocessingMixin:
@@ -178,7 +197,7 @@ def format_record(
     record: dict,
     filepath: str,
     shift: Union[str, datetime],
-    additional_tags: Optional[List[str]] = None,
+    additional_tags: Union[str, Sequence[str], None] = None,
 ) -> dict:
     """Format an Event Log record as structured JSON.
 
@@ -222,10 +241,7 @@ def format_record(
             "tags": [str]
         }
     """
-    # User defined tags
-    tags = ["eventlog"]
-    if additional_tags:
-        tags.extend(additional_tags)
+    tags = normalize_tags(additional_tags)
 
     # Parse the raw event data
     parsed_data = _parse_event_data(record)
@@ -306,7 +322,7 @@ def process_by_chunk(
     records: List[dict],
     filepath: Union[Generator, str],
     shift: Union[Generator, str, datetime],
-    additional_tags: Union[Generator, Optional[List[str]]] = None,
+    additional_tags: Union[Generator, str, Sequence[str], None] = None,
 ) -> List[dict]:
     """Perform formatting for each chunk. (for efficiency)
 
@@ -323,10 +339,9 @@ def process_by_chunk(
     # Accept both raw values (multiprocess path) and generators (single-process path)
     filepath = filepath if isinstance(filepath, str) else next(filepath)
     shift = shift if isinstance(shift, (str, datetime)) else next(shift)
-    if isinstance(additional_tags, list) or additional_tags is None:
-        pass
-    else:
+    if isinstance(additional_tags, GeneratorABC):
         additional_tags = next(additional_tags)
+    additional_tags = normalize_tags(additional_tags)
 
     record_list = records
 
@@ -359,7 +374,7 @@ class Evtx2es(SafeMultiprocessingMixin):
         shift: Union[str, datetime],
         multiprocess: bool,
         chunk_size: int,
-        additional_tags: Optional[List[str]] = None,
+        additional_tags: Union[str, Sequence[str], None] = None,
     ) -> Generator:
         """Generate chunks of formatted Event Log records.
 

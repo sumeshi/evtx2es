@@ -1,6 +1,6 @@
 # coding: utf-8
 from datetime import datetime
-from typing import List, Generator, Union, Callable, Optional
+from typing import List, Generator, Union, Callable, Optional, Sequence
 from pathlib import Path
 
 from tqdm import tqdm
@@ -25,7 +25,7 @@ class Evtx2esPresenter:
         is_quiet: bool = False,
         multiprocess: bool = False,
         chunk_size: int = 500,
-        additional_tags: Optional[List[str]] = None,
+        additional_tags: Optional[Union[str, Sequence[str]]] = None,
         logger: Optional[Callable[[str, bool], None]] = None,
         verify_certs: bool = True,
         ca_certs: str | None = None,

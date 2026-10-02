@@ -1,6 +1,6 @@
 # coding: utf-8
 from datetime import datetime
-from typing import List, Union
+from typing import List, Union, Sequence
 from pathlib import Path
 
 from evtx2es.models.Evtx2es import Evtx2es
@@ -22,7 +22,7 @@ def evtx2es(
     pwd: str = "",
     multiprocess: bool = False,
     chunk_size: int = 500,
-    additional_tags: List[str] = None,
+    additional_tags: Union[str, Sequence[str]] = None,
     verify_certs: bool = True,
 ) -> None:
     """Fast import of Windows Event Logs into Elasticsearch.
@@ -60,8 +60,8 @@ def evtx2es(
         chunk_size (int, optional):
             Size of the chunk to be processed for each process.
 
-        additional_tags (List[str], optional):
-            Additional tags to add to each record.
+        additional_tags (str or Sequence[str], optional):
+            Comma-separated string or sequence of tags to add to each record.
 
         verify_certs (bool, optional):
             Whether to verify TLS certificates for Elasticsearch connections.
@@ -90,7 +90,7 @@ def evtx2json(
     shift: Union[str, datetime] = "0",
     multiprocess: bool = False,
     chunk_size: int = 500,
-    additional_tags: List[str] = None,
+    additional_tags: Union[str, Sequence[str]] = None,
 ) -> List[dict]:
     """Convert a Windows Event Log file to a list of dictionaries.
 
@@ -99,7 +99,8 @@ def evtx2json(
         shift (Union[str, datetime]): Timestamp shift value. Defaults to '0'.
         multiprocess (bool): Flag to run multiprocessing.
         chunk_size (int): Size of the chunk to be processed for each process.
-        additional_tags (List[str], optional): Additional tags to add to each record.
+        additional_tags (str or Sequence[str], optional): Comma-separated string
+            or sequence of tags to add to each record.
 
     Note:
         Since the content of the file is loaded into memory at once,

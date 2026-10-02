@@ -2,7 +2,7 @@
 from datetime import datetime
 from itertools import chain
 from pathlib import Path
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Sequence
 
 import orjson
 from evtx2es.models.Evtx2es import Evtx2es
@@ -18,7 +18,7 @@ class Evtx2jsonPresenter:
         is_quiet: bool = False,
         multiprocess: bool = False,
         chunk_size: int = 500,
-        additional_tags: Optional[List[str]] = None,
+        additional_tags: Optional[Union[str, Sequence[str]]] = None,
         output_format: str = "json",
     ):
         if output_format not in ("json", "jsonl", "ndjson"):
