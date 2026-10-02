@@ -92,8 +92,6 @@ $ evtx2es /evtxfiles/ # This recursively processes file1 through file6.
 
 --tags:
   Comma-separated tags to add to each record (default: no additional tags).
-  Whitespace and empty tags are removed; duplicates are omitted with `eventlog`
-  first.
 
 --login:
   Username for Elasticsearch authentication
@@ -129,11 +127,8 @@ With Elasticsearch authentication:
 $ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foobar --login=elastic --pwd=******
 ```
 
-> [!WARNING]
-> TLS certificate verification is enabled by default. Use `--no-verify-certs` only
-> when connecting to a trusted cluster with a self-signed or otherwise
-> unverifiable certificate. Use `--ca-certs /path/to/ca.pem` to provide a
-> private CA bundle while keeping verification enabled.
+TLS verification is enabled by default. For a private CA, use
+`--ca-certs /path/to/ca.pem`.
 
 
 ## Appendix
@@ -146,9 +141,8 @@ $ evtx2es /path/to/your/file.evtx --host=localhost --port=9200 --index=foobar --
 $ evtx2json /path/to/your/file.evtx /path/to/output/target.json
 ```
 
-`evtx2json` also supports line-delimited output. `--format jsonl` (or `ndjson`)
-writes one record per line without holding the entire dataset in memory. When
-no output path is specified, the default extension is `.jsonl`:
+Use `--format jsonl` (or `ndjson`) to write one record per line.
+The default output extension is `.jsonl`:
 
 ```bash
 $ evtx2json /path/to/your/file.evtx --format jsonl
@@ -277,7 +271,7 @@ $ uv add evtx2es
 
 ### From GitHub Releases
 
-Standalone binaries built with Nuitka are available from GitHub Releases for systems without a Python environment.
+Standalone binaries are available from GitHub Releases for systems without a Python environment.
 
 ```bash
 $ chmod +x ./evtx2es
