@@ -10,15 +10,15 @@ authors = [
 requires-python = ">=3.13"
 
 dependencies = [
-    "elasticsearch==9.4.1",
-    "evtx==0.11.1",
-    "orjson==3.11.9",
-    "tqdm>=4.67.3",
-    "urllib3>=2.6.3",
+    "elasticsearch==9.5.1",
+    "evtx==0.13.1",
+    "orjson==3.13.0",
+    "tqdm>=4.70.1",
+    "urllib3>=2.8.0",
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.32.4"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
@@ -26,11 +26,11 @@ path = "src/evtx2es/__about__.py"
 
 [dependency-groups]
 dev = [
-    "black==26.5.1",
-    "flake8>=7.3.0",
-    "mypy==2.1.0",
-    "nuitka[onefile]==4.1.2",
-    "pytest==9.0.3",
+    "black==26.10.1",
+    "flake8>=7.4.1",
+    "mypy==2.4.0",
+    "nuitka[onefile]==4.3",
+    "pytest==9.1.1",
 ]
 
 [project.scripts]

@@ -5,6 +5,9 @@ on:
     branches:
       - master
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -15,31 +18,29 @@ jobs:
         python-version: ['3.13']
     steps:
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7.0.1
 
       - name: install python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           python-version: ${{ matrix.python-version }}
       
       - name: Install dependencies
         run: |
-          pip install uv
-          uv sync
+          uv sync --locked
 
       - name: run python
         run: |
-          uv run evtx2es -h
-          uv run evtx2json -h
+          uv run --locked evtx2es -h
+          uv run --locked evtx2json -h
       
       - name: Collect runtime licenses
-        run: uv run python .github/collect_runtime_licenses.py dist/LICENSES.txt
+        run: uv run --locked python .github/collect_runtime_licenses.py dist/LICENSES.txt
 
       - name: build
         run: |
-          pip install nuitka
-          uv run python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2es.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
-          uv run python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2json.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
+          uv run --locked python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2es.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
+          uv run --locked python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2json.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
       
       - name: verify
         run: |
@@ -66,11 +67,11 @@ jobs:
           mv dist/evtx2es.exe "$bundle/evtx2es.exe"
           mv dist/evtx2json.exe "$bundle/evtx2json.exe"
           cp dist/LICENSES.txt "$bundle/LICENSES.txt"
-          python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
+          uv run --locked python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
         shell: bash
 
       - name: create release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3.0.3
         if: startsWith(github.ref, 'refs/heads/master')
         with:
           tag_name: v${{ steps.create_tag.outputs.version }}
@@ -89,32 +90,30 @@ jobs:
         python-version: ['3.13']
     steps:
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7.0.1
 
       - name: install python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           python-version: ${{ matrix.python-version }}
       
       - name: Install dependencies
         run: |
           sudo apt install patchelf
-          pip install uv
-          uv sync
+          uv sync --locked
 
       - name: run python
         run: |
-          uv run evtx2es -h
-          uv run evtx2json -h
+          uv run --locked evtx2es -h
+          uv run --locked evtx2json -h
 
       - name: Collect runtime licenses
-        run: uv run python .github/collect_runtime_licenses.py dist/LICENSES.txt
+        run: uv run --locked python .github/collect_runtime_licenses.py dist/LICENSES.txt
 
       - name: build
         run: |
-          pip install nuitka
-          uv run python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2es --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
-          uv run python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2json --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
+          uv run --locked python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2es --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
+          uv run --locked python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2json --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
       
       - name: verify
         run: |
@@ -129,12 +128,12 @@ jobs:
           mv dist/evtx2es "$bundle/evtx2es"
           mv dist/evtx2json "$bundle/evtx2json"
           cp dist/LICENSES.txt "$bundle/LICENSES.txt"
-          python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
+          uv run --locked python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
         shell: bash
 
       - name: upload asset to release
         if: startsWith(github.ref, 'refs/heads/master')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: v${{ needs.build-windows.outputs.version }}
           files: |

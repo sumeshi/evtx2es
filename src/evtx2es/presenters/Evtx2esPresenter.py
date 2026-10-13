@@ -1,12 +1,21 @@
 # coding: utf-8
-from datetime import datetime
+from datetime import timedelta
 from typing import List, Generator, Union, Callable, Optional, Sequence
 from pathlib import Path
 
 from tqdm import tqdm
 
-from evtx2es.models.Evtx2es import Evtx2es
+from evtx2es.models.Evtx2es import (
+    Evtx2es,
+    PartialExtractionError,
+    normalize_shift,
+    validate_chunk_size,
+)
 from evtx2es.models.ElasticsearchUtils import ElasticsearchUtils
+
+
+class InputProcessingError(RuntimeError):
+    pass
 
 
 class Evtx2esPresenter:
@@ -19,7 +28,7 @@ class Evtx2esPresenter:
         index: str = "evtx2es",
         scheme: str = "http",
         pipeline: str = "",
-        shift: Union[str, datetime] = "0",
+        shift: Union[str, timedelta, None] = "0",
         login: str = "",
         pwd: str = "",
         is_quiet: bool = False,
@@ -30,13 +39,14 @@ class Evtx2esPresenter:
         verify_certs: bool = True,
         ca_certs: str | None = None,
     ):
+        validate_chunk_size(chunk_size)
         self.input_path = input_path
         self.host = host
         self.port = port
         self.index = index
         self.scheme = scheme
         self.pipeline = pipeline
-        self.shift = shift
+        self.shift = normalize_shift(shift)
         self.login = login
         self.pwd = pwd
         self.is_quiet = is_quiet
@@ -48,22 +58,51 @@ class Evtx2esPresenter:
         self.ca_certs = ca_certs
 
     def evtx2es(self) -> Generator[List[dict], None, None]:
-        r = Evtx2es(self.input_path)
         try:
-            for batch in (
-                r.gen_records(
-                    self.shift, self.multiprocess, self.chunk_size, self.additional_tags
+            r = Evtx2es(self.input_path)
+        except Exception as error:
+            raise InputProcessingError(
+                f"Failed to process EVTX input {self.input_path}: {error}"
+            ) from error
+        records = None
+        progress = None
+        try:
+            try:
+                records = r.gen_records(
+                    self.shift,
+                    self.multiprocess,
+                    self.chunk_size,
+                    self.additional_tags,
                 )
-                if self.is_quiet
-                else tqdm(
-                    r.gen_records(
-                        self.shift, self.multiprocess, self.chunk_size, self.additional_tags
-                    )
-                )
-            ):
+                progress = records if self.is_quiet else tqdm(records)
+                iterator = iter(progress)
+            except Exception as error:
+                raise InputProcessingError(
+                    f"Failed to process EVTX input {self.input_path}: {error}"
+                ) from error
+
+            while True:
+                try:
+                    batch = next(iterator)
+                except StopIteration:
+                    break
+                except Exception as error:
+                    raise InputProcessingError(
+                        f"Failed to process EVTX input {self.input_path}: {error}"
+                    ) from error
                 yield batch
+            if r.diagnostics:
+                raise PartialExtractionError(r.diagnostics)
         finally:
-            r.close()
+            try:
+                if progress is not None and progress is not records:
+                    progress.close()
+            finally:
+                try:
+                    if records is not None:
+                        records.close()
+                finally:
+                    r.close()
 
     def bulk_import(self):
         es = ElasticsearchUtils(

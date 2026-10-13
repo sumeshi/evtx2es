@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   dev:
     build:
@@ -11,7 +9,7 @@ services:
     tty: true
 
   elasticsearch:
-    image: elasticsearch:9.3.1
+    image: elasticsearch:9.5.1
     container_name: evtx2es-elasticsearch
     ports:
       - "9200:9200"
@@ -24,9 +22,9 @@ services:
         hard: -1
 
   kibana:
-    image: kibana:9.3.1
+    image: kibana:9.5.1
     container_name: evtx2es-kibana
     ports:
       - 5601:5601
     environment:
-      - elasticsearch.host="http://localhost:9200"
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200

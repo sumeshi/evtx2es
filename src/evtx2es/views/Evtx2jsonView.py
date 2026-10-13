@@ -1,6 +1,8 @@
 # coding: utf-8
 from multiprocessing import cpu_count
+import sys
 
+from evtx2es.models.Evtx2es import PartialExtractionError
 from evtx2es.views.BaseView import BaseView
 from evtx2es.presenters.Evtx2jsonPresenter import Evtx2jsonPresenter
 
@@ -32,23 +34,34 @@ class Evtx2jsonView(BaseView):
         )
 
     def run(self):
-        shift, additional_tags = self.get_shift_and_tags()
+        try:
+            shift, additional_tags = self.get_shift_and_tags()
 
-        self.log(f"Converting {self.args.evtx_file}.", self.args.quiet)
+            self.log(f"Converting {self.args.evtx_file}.", self.args.quiet)
 
-        if self.args.multiprocess:
-            self.log(f"Multiprocessing enabled ({cpu_count()} workers).", self.args.quiet)
+            if self.args.multiprocess:
+                self.log(f"Multiprocessing enabled ({cpu_count()} workers).", self.args.quiet)
 
-        Evtx2jsonPresenter(
-            input_path=self.args.evtx_file,
-            output_path=self.args.output_file,
-            shift=shift,
-            is_quiet=self.args.quiet,
-            multiprocess=self.args.multiprocess,
-            chunk_size=int(self.args.size),
-            additional_tags=additional_tags,
-            output_format=self.args.format,
-        ).export_json()
+            Evtx2jsonPresenter(
+                input_path=self.args.evtx_file,
+                output_path=self.args.output_file,
+                shift=shift,
+                is_quiet=self.args.quiet,
+                multiprocess=self.args.multiprocess,
+                chunk_size=int(self.args.size),
+                additional_tags=additional_tags,
+                output_format=self.args.format,
+            ).export_json()
+        except Exception as error:
+            if isinstance(error, PartialExtractionError):
+                details = "; ".join(
+                    f"{item['source_file']}: {item['error']}"
+                    for item in error.diagnostics
+                )
+                print(f"Error: {details}", file=sys.stderr)
+            else:
+                print(f"Error: {error}", file=sys.stderr)
+            raise SystemExit(1) from None
 
         self.log("Conversion completed successfully.", self.args.quiet)
 

@@ -107,9 +107,9 @@ def collect(output_file: Path) -> None:
                 )
                 if text.strip():
                     materials.append(f"--- {path} ---\n{text.rstrip()}")
-        if not materials and (name, package.version) == ("evtx", "0.11.1"):
+        if not materials and (name, package.version) == ("evtx", "0.13.1"):
             materials.append(
-                (project_root / "LICENSES" / "evtx-0.11.1.txt").read_text(
+                (project_root / "LICENSES" / "evtx-0.13.1.txt").read_text(
                     encoding="utf-8"
                 )
             )

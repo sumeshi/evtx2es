@@ -1,6 +1,7 @@
 import importlib
 import json
 import sys
+from datetime import timedelta
 
 import pytest
 
@@ -50,11 +51,11 @@ def test_process_by_chunk_normalizes_api_values_without_treating_them_as_generat
         return {"tags": additional_tags}
 
     monkeypatch.setattr(module, "format_record", fake_format_record)
-    assert process_by_chunk([{}], "input.evtx", "0", value) == [{"tags": expected}]
+    assert process_by_chunk([{}], "input.evtx", None, value) == [{"tags": expected}]
     assert captured == [expected]
 
 
-def test_process_by_chunk_preserves_internal_generator_path(monkeypatch):
+def test_process_by_chunk_uses_raw_values_for_all_records(monkeypatch):
     module = importlib.import_module("evtx2es.models.Evtx2es")
     captured = []
     monkeypatch.setattr(
@@ -66,22 +67,19 @@ def test_process_by_chunk_preserves_internal_generator_path(monkeypatch):
         or {"tags": additional_tags},
     )
 
-    def tags():
-        yield ("host01", "eventlog")
-
-    result = process_by_chunk([{}], iter(["input.evtx"]), iter(["0"]), tags())
-    assert result == [{"tags": ["eventlog", "host01"]}]
-    assert captured == [["eventlog", "host01"]]
+    result = process_by_chunk([{}, {}], "input.evtx", timedelta(milliseconds=125), ("host01", "eventlog"))
+    assert result == [{"tags": ["eventlog", "host01"]}] * 2
+    assert captured == [["eventlog", "host01"]] * 2
 
 
 def test_json_and_jsonl_schema_matches(tmp_path, monkeypatch, raw_record):
     module = importlib.import_module("evtx2es.presenters.Evtx2jsonPresenter")
     model = importlib.import_module("evtx2es.models.Evtx2es")
-    record = model.format_record(raw_record, "input.evtx", "0", "host01,eventlog")
+    record = model.format_record(raw_record, "input.evtx", None, "host01,eventlog")
 
     class Model:
         def __init__(self, input_path):
-            pass
+            self.diagnostics = []
 
         def gen_records(self, *args):
             assert args[-1] == "host01,eventlog"
@@ -136,6 +134,44 @@ def test_public_api_formats_tags_from_raw_event(
     assert len(records) == 1
     assert records[0]["tags"] == expected
     assert records[0]["event"]["dataset"] == "windows.eventlog"
+
+def test_public_api_partial_recovery_keeps_records_and_diagnostics(tmp_path, monkeypatch):
+    model = importlib.import_module("evtx2es.models.Evtx2es")
+    source = tmp_path / "sample.evtx"
+    source.write_bytes(b"fixture")
+
+    class RecoveringIterator:
+        def __init__(self):
+            self.items = iter([{"n": 1}, ValueError("damaged record"), {"n": 2}])
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            item = next(self.items)
+            if isinstance(item, Exception):
+                raise item
+            return item
+
+    class FakeParser:
+        def __init__(self, file_object):
+            pass
+
+        def records_json(self):
+            return RecoveringIterator()
+
+    monkeypatch.setattr(model, "PyEvtxParser", FakeParser)
+    monkeypatch.setattr(model, "process_by_chunk", lambda records, *args: list(records))
+    with pytest.raises(model.PartialExtractionError) as raised:
+        evtx2es_package.evtx2json(str(source))
+
+    assert raised.value.records == [{"n": 1}, {"n": 2}]
+    assert raised.value.diagnostics == [
+        {
+            "source_file": str(source.resolve()),
+            "error": "ValueError: damaged record",
+        }
+    ]
 
 
 @pytest.fixture

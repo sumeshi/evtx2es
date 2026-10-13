@@ -130,10 +130,10 @@ def test_python_license_is_in_output(tmp_path, monkeypatch):
 @pytest.mark.parametrize("upstream_text", [None, "Upstream MIT and copyright"])
 def test_parser_mit_fallback(tmp_path, monkeypatch, upstream_text):
     collector = load_collector()
-    info = tmp_path / "evtx-0.11.1.dist-info"
+    info = tmp_path / "evtx-0.13.1.dist-info"
     info.mkdir()
     (info / "METADATA").write_text(
-        "Name: evtx\nVersion: 0.11.1\n", encoding="utf-8"
+        "Name: evtx\nVersion: 0.13.1\n", encoding="utf-8"
     )
     if upstream_text:
         (info / "LICENSE").write_text(upstream_text, encoding="utf-8")
@@ -146,7 +146,7 @@ def test_parser_mit_fallback(tmp_path, monkeypatch, upstream_text):
     output = tmp_path / "LICENSES.txt"
     collector.collect(output)
     text = output.read_text(encoding="utf-8")
-    fallback = (ROOT / "LICENSES/evtx-0.11.1.txt").read_text(
+    fallback = (ROOT / "LICENSES/evtx-0.13.1.txt").read_text(
         encoding="utf-8"
     ).rstrip()
     if upstream_text:

@@ -1,7 +1,7 @@
 # coding: utf-8
 import argparse
 from abc import ABCMeta, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 
 from evtx2es.__about__ import __version__
 
@@ -55,7 +55,7 @@ class BaseView(metaclass=ABCMeta):
             default=None,
             help=(
                 "Shift timestamps based on the latest record's TimeCreated value "
-                "(MM/DD/YYYY.HH:MM:SS)."
+                "(MM/DD/YYYY.HH:MM:SS, interpreted as UTC)."
             ),
         )
 
@@ -63,9 +63,9 @@ class BaseView(metaclass=ABCMeta):
         # shift timestamp
         if getattr(self.args, "datasetdate", None) is not None:
             dataset_date = datetime.strptime(self.args.datasetdate, "%m/%d/%Y.%H:%M:%S")
-            shift = datetime.now() - dataset_date
+            shift = datetime.now(timezone.utc) - dataset_date.replace(tzinfo=timezone.utc)
         else:
-            shift = "0"
+            shift = None
 
         # Parse tags
         additional_tags = None

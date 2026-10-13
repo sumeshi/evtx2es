@@ -1,13 +1,14 @@
-evtx 0.11.1 — MIT
+evtx 0.13.1 — MIT
 
-License declaration: License :: OSI Approved :: MIT License
-Source: https://github.com/omerbenamram/pyevtx-rs/blob/2b82a8b4935588248b8b09af4c537f2e32112521/pyproject.toml
+License declaration: MIT classifier in the upstream Python project metadata.
+The embedded Rust crate's Cargo metadata declares MIT/Apache-2.0; the MIT
+option is supplied here. Source: https://github.com/omerbenamram/pyevtx-rs/blob/0fe74a28edaa5030ed06c4c0e0a9f7b5a33d301e/pyproject.toml
 Upstream author metadata: Omer Ben-Amram <omerbenamram@gmail.com>
 
-Upstream provides no license text or copyright notice in this release's
-repository tree or wheel. The standard MIT text below is supplied based on
-its explicit MIT declaration. The copyright line is the standard template,
-not an upstream notice; its placeholders have deliberately not been filled in.
+The tagged source tree and installed wheel contain no license text or copyright
+notice. The standard MIT text below is supplied based on the upstream MIT
+declaration. The copyright line is the standard template, not an upstream
+notice; its placeholders have deliberately not been filled in.
 
 Standard license: https://opensource.org/license/mit
 Text source: https://github.com/spdx/license-list-data/blob/main/text/MIT.txt

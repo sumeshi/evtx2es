@@ -1,9 +1,15 @@
 # coding: utf-8
-from datetime import datetime
+from datetime import timedelta
 from typing import List, Union, Sequence
 from pathlib import Path
+from itertools import chain
 
-from evtx2es.models.Evtx2es import Evtx2es
+from evtx2es.models.Evtx2es import (
+    Evtx2es,
+    PartialExtractionError,
+    normalize_shift,
+    validate_chunk_size,
+)
 from evtx2es.presenters.Evtx2esPresenter import Evtx2esPresenter
 
 
@@ -17,7 +23,7 @@ def evtx2es(
     index: str = "evtx2es",
     scheme: str = "http",
     pipeline: str = "",
-    shift: str = "0",
+    shift: Union[str, timedelta, None] = "0",
     login: str = "",
     pwd: str = "",
     multiprocess: bool = False,
@@ -45,8 +51,8 @@ def evtx2es(
         pipeline (str, optional):
             Elasticsearch Ingest Pipeline. Defaults to "".
 
-        shift (str, optional):
-            Time shift for dataset. Defaults to "0".
+        shift (timedelta or None, optional):
+            Timestamp shift. The legacy "0" value is treated as no shift.
 
         login (str, optional):
             Elasticsearch login to connect into.
@@ -79,7 +85,7 @@ def evtx2es(
         pwd=pwd,
         is_quiet=True,
         multiprocess=multiprocess,
-        chunk_size=int(chunk_size),
+        chunk_size=chunk_size,
         additional_tags=additional_tags,
         verify_certs=verify_certs,
     ).bulk_import()
@@ -87,7 +93,7 @@ def evtx2es(
 
 def evtx2json(
     input_path: str,
-    shift: Union[str, datetime] = "0",
+    shift: Union[str, timedelta, None] = "0",
     multiprocess: bool = False,
     chunk_size: int = 500,
     additional_tags: Union[str, Sequence[str]] = None,
@@ -96,7 +102,7 @@ def evtx2json(
 
     Args:
         input_path (str): Input Event Log file.
-        shift (Union[str, datetime]): Timestamp shift value. Defaults to '0'.
+        shift (timedelta or None): Timestamp shift. Defaults to no shift.
         multiprocess (bool): Flag to run multiprocessing.
         chunk_size (int): Size of the chunk to be processed for each process.
         additional_tags (str or Sequence[str], optional): Comma-separated string
@@ -106,20 +112,23 @@ def evtx2json(
         Since the content of the file is loaded into memory at once,
         it requires the same amount of memory as the file to be loaded.
     """
+    validate_chunk_size(chunk_size)
+    shift = normalize_shift(shift)
     evtx = Evtx2es(Path(input_path).resolve())
     try:
-        records: List[dict] = sum(
-            list(
+        records: List[dict] = list(
+            chain.from_iterable(
                 evtx.gen_records(
                     shift=shift,
                     multiprocess=multiprocess,
                     chunk_size=chunk_size,
                     additional_tags=additional_tags,
                 )
-            ),
-            list(),
+            )
         )
     finally:
         evtx.close()
 
+    if evtx.diagnostics:
+        raise PartialExtractionError(evtx.diagnostics, records)
     return records

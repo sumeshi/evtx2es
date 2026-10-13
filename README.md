@@ -52,6 +52,10 @@ evtxfiles/
 $ evtx2es /evtxfiles/ # This recursively processes file1 through file6.
 ```
 
+Input and extraction errors are reported to stderr while remaining inputs are
+processed. Partial extraction exits 1, even with `--quiet`; output and
+Elasticsearch errors stop processing.
+
 
 ### Options
 
@@ -88,7 +92,7 @@ $ evtx2es /evtxfiles/ # This recursively processes file1 through file6.
 
 --datasetdate:
   Shift timestamps based on the latest record's `TimeCreated` value
-  (MM/DD/YYYY.HH:MM:SS). If omitted, timestamps are not shifted.
+  (MM/DD/YYYY.HH:MM:SS, interpreted as UTC). If omitted, timestamps are not shifted.
 
 --tags:
   Comma-separated tags to add to each record (default: no additional tags).
@@ -155,6 +159,9 @@ from evtx2es import evtx2json
 
 result: list[dict] = evtx2json('/path/to/your/file.evtx')
 ```
+
+Python APIs raise `PartialExtractionError` on recovered partial results;
+JSON APIs expose completed records in the exception's `records` attribute.
 
 
 ## Output Format Example
@@ -317,23 +324,23 @@ These libraries remain under their original licenses.
 ### Apache-2.0
 
 - [elasticsearch-py / elasticsearch](https://github.com/elastic/elasticsearch-py) — licensed under the Apache License 2.0.
-  - Bundled version: `elasticsearch==9.4.1`
+  - Bundled version: `elasticsearch==9.5.1`
   - License text: https://github.com/elastic/elasticsearch-py/blob/main/LICENSE
 
 ### MIT
 
 - [evtx / pyevtx-rs](https://github.com/omerbenamram/pyevtx-rs) — licensed under the MIT License.
-  - Bundled version: `evtx==0.11.1`
+  - Bundled version: `evtx==0.13.1`
   - License text: https://github.com/omerbenamram/pyevtx-rs/blob/master/pyproject.toml
 
 - [urllib3](https://github.com/urllib3/urllib3) — licensed under the MIT License.
-  - Bundled version: `urllib3==2.6.3`
+  - Bundled version: `urllib3==2.8.0`
   - License text: https://github.com/urllib3/urllib3/blob/main/LICENSE.txt
 
 ### Apache-2.0 OR MIT, with MPL-2.0 components
 
 - [orjson](https://github.com/ijl/orjson) — licensed under Apache-2.0 OR MIT, and contains source code licensed under MPL-2.0.
-  - Bundled version: `orjson==3.11.9`
+  - Bundled version: `orjson==3.13.0`
   - License text:
     - https://github.com/ijl/orjson/blob/master/LICENSE-APACHE
     - https://github.com/ijl/orjson/blob/master/LICENSE-MIT
@@ -342,5 +349,5 @@ These libraries remain under their original licenses.
 ### MIT and MPL-2.0
 
 - [tqdm](https://github.com/tqdm/tqdm) — licensed under MIT, with MPL-2.0-covered files/components.
-  - Bundled version: `tqdm==4.67.3`
+  - Bundled version: `tqdm==4.70.1`
   - License text: https://github.com/tqdm/tqdm/blob/master/LICENCE

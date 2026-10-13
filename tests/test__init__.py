@@ -102,7 +102,7 @@ def test__gen_records_yields_each_chunk_without_extra_buffering(monkeypatch):
     evtx.path = Path("dummy.evtx")
     evtx.parser = DummyParser()
 
-    assert list(evtx.gen_records("0", False, 2)) == [[0, 1], [2, 3], [4]]
+    assert list(evtx.gen_records(None, False, 2)) == [[0, 1], [2, 3], [4]]
 
 
 def test__evtx2json_public_api_closes_evtx(monkeypatch):
@@ -111,6 +111,7 @@ def test__evtx2json_public_api_closes_evtx(monkeypatch):
 
         def __init__(self, input_path):
             self.input_path = input_path
+            self.diagnostics = []
 
         def gen_records(self, **kwargs):
             yield []

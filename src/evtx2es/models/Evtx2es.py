@@ -1,13 +1,13 @@
 # coding: utf-8
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import List, Generator, Iterable, Union, Any, Optional, Sequence
-from collections.abc import Generator as GeneratorABC
+from typing import List, Generator, Iterable, Union, Any, Optional, Sequence, Callable
 import multiprocessing as mp
 import sys
 import os
 from collections import deque
 import logging
+import re
 
 import orjson
 from evtx import PyEvtxParser
@@ -15,6 +15,30 @@ from evtx import PyEvtxParser
 
 MAX_CONSECUTIVE_PARSE_ERRORS = 100
 logger = logging.getLogger(__name__)
+
+
+class PartialExtractionError(RuntimeError):
+    def __init__(self, diagnostics, records=None):
+        self.diagnostics = list(diagnostics)
+        self.records = records
+        super().__init__(
+            f"Partial extraction: {len(self.diagnostics)} failure(s); "
+            "output is incomplete."
+        )
+
+
+
+def normalize_shift(shift: Union[str, timedelta, None]) -> Optional[timedelta]:
+    if shift == "0":
+        return None
+    if shift is not None and not isinstance(shift, timedelta):
+        raise TypeError("shift must be a timedelta or None")
+    return shift
+
+
+def validate_chunk_size(chunk_size: int) -> None:
+    if type(chunk_size) is not int or chunk_size <= 0:
+        raise ValueError("chunk_size must be greater than zero")
 
 
 def normalize_tags(
@@ -61,7 +85,11 @@ class SafeMultiprocessingMixin:
             return os.cpu_count() or 1
 
 
-def generate_chunks(chunk_size: int, iterable: Iterable) -> Generator:
+def generate_chunks(
+    chunk_size: int,
+    iterable: Iterable,
+    on_parse_error: Optional[Callable[[Exception], None]] = None,
+) -> Generator:
     """Generate arbitrarily sized chunks from iterable objects, maximizing data recovery.
 
     Parser errors are skipped to salvage later records, but repeated errors without
@@ -74,6 +102,7 @@ def generate_chunks(chunk_size: int, iterable: Iterable) -> Generator:
     Yields:
         Generator: List
     """
+    validate_chunk_size(chunk_size)
     iterator = iter(iterable)
     piece = []
     consecutive_errors = 0
@@ -101,6 +130,8 @@ def generate_chunks(chunk_size: int, iterable: Iterable) -> Generator:
             except Exception as exc:
                 consecutive_errors += 1
                 skipped_errors += 1
+                if on_parse_error is not None:
+                    on_parse_error(exc)
                 if consecutive_errors >= MAX_CONSECUTIVE_PARSE_ERRORS:
                     raise RuntimeError(
                         "EVTX parser failed repeatedly without yielding "
@@ -143,17 +174,26 @@ def _parse_event_data(record: dict) -> dict:
     }
 
 
-def _create_timestamp_field(system_time: str, shift: Union[str, datetime]) -> str:
+def _create_timestamp_field(system_time: str, shift: Optional[timedelta]) -> str:
     """Create timestamp field with optional shift."""
-    if shift != "0" and isinstance(shift, datetime):
-        try:
-            current_timestamp = datetime.strptime(system_time, "%Y-%m-%dT%H:%M:%S.%fZ")
-        except ValueError:
-            current_timestamp = datetime.strptime(system_time, "%Y-%m-%dT%H:%M:%SZ")
-        final_timestamp = current_timestamp + timedelta(seconds=shift.seconds) + timedelta(days=shift.days)
-        return final_timestamp.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-    else:
-        return system_time
+    if shift is not None:
+        match = re.search(r"\.(\d+)(?=Z|[+-]\d\d:\d\d$)", system_time)
+        fraction = match.group(1) if match else ""
+        normalized = system_time.replace("Z", "+00:00")
+        if match and len(fraction) > 6:
+            start, end = match.span(1)
+            normalized = normalized[:start] + fraction[:6] + normalized[end:]
+        current_timestamp = datetime.fromisoformat(normalized)
+        if current_timestamp.tzinfo is None:
+            current_timestamp = current_timestamp.replace(tzinfo=timezone.utc)
+        final_timestamp = current_timestamp.astimezone(timezone.utc) + shift
+        result = final_timestamp.strftime("%Y-%m-%dT%H:%M:%S")
+        precision = max(len(fraction), 6 if final_timestamp.microsecond else 0)
+        if precision:
+            digits = f"{final_timestamp.microsecond:06d}" + fraction[6:]
+            result += "." + digits[:precision]
+        return result + "Z"
+    return system_time
 
 
 def _normalize_field_value(key: str, value) -> Any:
@@ -196,7 +236,7 @@ def _create_normalized_event_data(event_data: dict) -> dict:
 def format_record(
     record: dict,
     filepath: str,
-    shift: Union[str, datetime],
+    shift: Optional[timedelta],
     additional_tags: Union[str, Sequence[str], None] = None,
 ) -> dict:
     """Format an Event Log record as structured JSON.
@@ -204,7 +244,7 @@ def format_record(
     Args:
         record (dict): Raw eventlog record with 'data' field containing JSON string.
         filepath (str): File path for logging.
-        shift (Union[str, datetime]): Timestamp shift value.
+        shift (timedelta or None): Timestamp shift.
         additional_tags (List[str], optional): Additional tags to add to the record.
 
     Returns:
@@ -320,27 +360,22 @@ def format_record(
 
 def process_by_chunk(
     records: List[dict],
-    filepath: Union[Generator, str],
-    shift: Union[Generator, str, datetime],
-    additional_tags: Union[Generator, str, Sequence[str], None] = None,
+    filepath: str,
+    shift: Optional[timedelta],
+    additional_tags: Union[str, Sequence[str], None] = None,
 ) -> List[dict]:
     """Perform formatting for each chunk. (for efficiency)
 
     Args:
         records (List[str]): A chunk of Event Log records in JSON form.
-        filepath (List[str]): list with 1 element.
-        shift (List[Union[str, datetime]]): list with 1 element
+        filepath (str): Source event log path.
+        shift (timedelta or None): Timestamp shift.
         additional_tags (List[str], optional): Additional tags to add to each record.
 
     Yields:
         List[dict]: A list of formatted Event Log records.
     """
 
-    # Accept both raw values (multiprocess path) and generators (single-process path)
-    filepath = filepath if isinstance(filepath, str) else next(filepath)
-    shift = shift if isinstance(shift, (str, datetime)) else next(shift)
-    if isinstance(additional_tags, GeneratorABC):
-        additional_tags = next(additional_tags)
     additional_tags = normalize_tags(additional_tags)
 
     record_list = records
@@ -361,17 +396,31 @@ def _mp_worker(args):
 class Evtx2es(SafeMultiprocessingMixin):
     def __init__(self, input_path: Path) -> None:
         self.path = input_path
+        self.diagnostics = []
         self._file_handle = self.path.open(mode="rb")
-        self.parser = PyEvtxParser(self._file_handle)
+        try:
+            self.parser = PyEvtxParser(self._file_handle)
+        except Exception:
+            self._file_handle.close()
+            self._file_handle = None
+            raise
 
     def close(self):
         if getattr(self, "_file_handle", None):
             self._file_handle.close()
             self._file_handle = None
 
+    def _record_parse_error(self, error: Exception) -> None:
+        self.diagnostics.append(
+            {
+                "source_file": str(Path(self.path).resolve()),
+                "error": f"{type(error).__name__}: {error}",
+            }
+        )
+
     def gen_records(
         self,
-        shift: Union[str, datetime],
+        shift: Optional[timedelta],
         multiprocess: bool,
         chunk_size: int,
         additional_tags: Union[str, Sequence[str], None] = None,
@@ -379,7 +428,7 @@ class Evtx2es(SafeMultiprocessingMixin):
         """Generate chunks of formatted Event Log records.
 
         Args:
-            shift (Union[str, datetime]): Timestamp shift value.
+            shift (timedelta or None): Timestamp shift.
             multiprocess (bool): Flag to run multiprocessing.
             chunk_size (int): Size of the chunk to be processed for each process.
             additional_tags (List[str], optional): Additional tags to add to each record.
@@ -388,14 +437,8 @@ class Evtx2es(SafeMultiprocessingMixin):
             Generator: Yields List[dict].
         """
 
-        gen_path = iter(lambda: str(self.path), None)
-        gen_shift = iter(lambda: shift, None)
-
-        def gen_tags():
-            while True:
-                yield additional_tags
-
-        gen_tags = gen_tags()
+        validate_chunk_size(chunk_size)
+        self.diagnostics = []
 
         if multiprocess:
             ctx = self.get_multiprocessing_context()
@@ -406,7 +449,7 @@ class Evtx2es(SafeMultiprocessingMixin):
                 # Consume the PyO3-backed iterator here, on the caller thread. Only
                 # materialized Python chunks cross into multiprocessing workers.
                 for chunk in generate_chunks(
-                    chunk_size, self.parser.records_json()
+                    chunk_size, self.parser.records_json(), self._record_parse_error
                 ):
                     pending.append(
                         pool.apply_async(
@@ -419,5 +462,7 @@ class Evtx2es(SafeMultiprocessingMixin):
                 while pending:
                     yield pending.popleft().get()
         else:
-            for records in generate_chunks(chunk_size, self.parser.records_json()):
-                yield process_by_chunk(records, gen_path, gen_shift, gen_tags)
+            for records in generate_chunks(
+                chunk_size, self.parser.records_json(), self._record_parse_error
+            ):
+                yield process_by_chunk(records, str(self.path), shift, additional_tags)
