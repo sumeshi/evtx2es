@@ -221,14 +221,24 @@ def _normalize_field_value(key: str, value) -> Any:
     return value
 
 
-def _create_normalized_event_data(event_data: dict) -> dict:
-    """Create normalized event_data fields."""
+def _create_normalized_event_data(
+    event_data: dict, original_values: Optional[dict] = None
+) -> dict:
+    """Normalize fields and optionally retain clamped integers as decimal text."""
     if not event_data or len(event_data) == 0:
         return {}
 
     normalized_data = {}
     for k, v in event_data.items():
-        normalized_data[k] = _normalize_field_value(k, v)
+        normalized = _normalize_field_value(k, v)
+        normalized_data[k] = normalized
+        if (
+            original_values is not None
+            and type(v) is int
+            and type(normalized) is int
+            and normalized != v
+        ):
+            original_values[k] = str(v)
 
     return normalized_data
 
@@ -271,7 +281,8 @@ def format_record(
                 "task": int,
                 "version": int,
                 "provider": {"name": str, "guid": str},
-                "event_data": dict (optional)
+                "event_data": dict (optional),
+                "event_data_original": dict (optional, clamped integers as text)
             },
             "userdata": dict (optional),
             "process": {"pid": int, "thread": {"id": int}} (optional),
@@ -330,10 +341,37 @@ def format_record(
         },
     }
 
+    # Keep source values used to assess or correlate events, including zeroes.
+    for source, target in (("Level", "level"), ("Keywords", "keywords")):
+        if source in system:
+            windows_eventlog[target] = system[source]
+
+    security = system.get("Security")
+    security_attrs = security.get("#attributes") if isinstance(security, dict) else None
+    if isinstance(security_attrs, dict) and "UserID" in security_attrs:
+        windows_eventlog["user"] = {"identifier": security_attrs["UserID"]}
+
+    correlation = system.get("Correlation")
+    correlation_attrs = (
+        correlation.get("#attributes") if isinstance(correlation, dict) else None
+    )
+    if isinstance(correlation_attrs, dict):
+        for source, target in (
+            ("ActivityID", "activity_id"),
+            ("RelatedActivityID", "related_activity_id"),
+        ):
+            if source in correlation_attrs:
+                windows_eventlog[target] = correlation_attrs[source]
+
     # Add event_data if present
-    normalized_event_data = _create_normalized_event_data(parsed_data["event_data"])
+    original_event_data = {}
+    normalized_event_data = _create_normalized_event_data(
+        parsed_data["event_data"], original_event_data
+    )
     if normalized_event_data:
         windows_eventlog["event_data"] = normalized_event_data
+    if original_event_data:
+        windows_eventlog["event_data_original"] = original_event_data
 
     # Build the final ECS-compliant result object
     result = {
