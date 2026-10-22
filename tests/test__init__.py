@@ -93,7 +93,7 @@ def test__gen_records_yields_each_chunk_without_extra_buffering(monkeypatch):
         def records_json(self):
             return iter(range(5))
 
-    def fake_process_by_chunk(records, filepath, shift, additional_tags=None):
+    def fake_process_by_chunk(records, filepath, shift, additional_tags=None, on_record_error=None):
         return list(records)
 
     monkeypatch.setattr(evtx2es_model, "process_by_chunk", fake_process_by_chunk)
