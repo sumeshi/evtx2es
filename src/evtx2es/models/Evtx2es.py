@@ -133,14 +133,6 @@ def _parse_event_data(record: dict) -> dict:
     if isinstance(system.get("EventID"), dict):
         system["EventID"] = system["EventID"].get("#text")
 
-    # Keep the existing Status behavior until mixed value shapes are checked
-    # against the Elasticsearch mapping.
-    try:
-        if "EventData" in event and event["EventData"] is not None and "Status" in event["EventData"]:
-            event["EventData"]["Status"] = None
-    except Exception:
-        pass
-
     return {
         "system": system,
         "event_data": event.get("EventData", {}),
@@ -172,6 +164,11 @@ def _create_timestamp_field(system_time: str, shift: Optional[timedelta]) -> str
 
 def _normalize_field_value(key: str, value) -> Any:
     """Normalize specific field values for ProcessId and numeric ranges."""
+    if key == "Status":
+        # Preserve the existing mapping-compatible null; the caller keeps its
+        # original value separately as lossless JSON text.
+        return None
+
     if key == "Reason":
         return str(value)
 
@@ -198,7 +195,7 @@ def _normalize_field_value(key: str, value) -> Any:
 def _create_normalized_event_data(
     event_data: dict, original_values: Optional[dict] = None
 ) -> dict:
-    """Normalize fields and optionally retain clamped integers as decimal text."""
+    """Retain clamped integers as decimal text and Status as typed JSON text."""
     if not event_data or len(event_data) == 0:
         return {}
 
@@ -206,7 +203,15 @@ def _create_normalized_event_data(
     for k, v in event_data.items():
         normalized = _normalize_field_value(k, v)
         normalized_data[k] = normalized
-        if (
+        if original_values is not None and k == "Status":
+            # Status can be a scalar, object or list across event providers.
+            # One text type avoids reintroducing its Elasticsearch mapping
+            # conflicts, while JSON decoding restores the original value/type.
+            # Sorted object keys keep IDs independent of insertion order.
+            original_values[k] = orjson.dumps(v, option=orjson.OPT_SORT_KEYS).decode(
+                "utf-8"
+            )
+        elif (
             original_values is not None
             and type(v) is int
             and type(normalized) is int
@@ -256,7 +261,8 @@ def format_record(
                 "version": int,
                 "provider": {"name": str, "guid": str},
                 "event_data": dict (optional),
-                "event_data_original": dict (optional, clamped integers as text)
+                "event_data_original": dict (optional, clamped integers as
+                    decimal text and Status as JSON text)
             },
             "userdata": dict (optional),
             "process": {"pid": int, "thread": {"id": int}} (optional),

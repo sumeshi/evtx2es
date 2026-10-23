@@ -75,3 +75,40 @@ def run_extra_cases(client, transport, new_index, stored_documents, document_id)
         document["winlog"]["event_data_original"]["Counter"]
         for document in actual.values()
     } == {str(2**63), str(2**64 - 1)}
+
+    # Event providers use different Status value shapes. Keep one ES text
+    # mapping while retaining the JSON type and distinguishing identical text.
+    statuses = [
+        "0x20",
+        "0",
+        0,
+        False,
+        None,
+        "false",
+        "null",
+        {"Code": "0x20", "Message": "失敗"},
+        [0, False, None],
+        2**64 - 1,
+    ]
+    documents = []
+    for status in statuses:
+        event = json.loads(raw["data"])
+        event["Event"]["EventData"] = {"Status": status, "Counter": 2**64 - 1}
+        record = {**raw, "data": json.dumps(event)}
+        documents.append(format_record(record, "generated.evtx", None))
+    original = deepcopy(documents)
+    index = new_index("status-shapes")
+    assert transport.bulk_indice(documents, index) == (len(statuses), [])
+    actual = stored_documents(client, index)
+    assert actual == {document_id(document): document for document in original}
+    assert len(actual) == len(statuses) and documents == original
+    for status, document in zip(statuses, original):
+        winlog = actual[document_id(document)]["winlog"]
+        assert winlog["event_data"]["Status"] is None
+        restored = json.loads(winlog["event_data_original"]["Status"])
+        assert restored == status and type(restored) is type(status)
+        assert winlog["event_data_original"]["Counter"] == str(2**64 - 1)
+    mapping = client.indices.get_mapping(index=index)[index]["mappings"][
+        "properties"
+    ]["winlog"]["properties"]["event_data_original"]["properties"]["Status"]
+    assert mapping["type"] in {"text", "keyword"}

@@ -52,6 +52,44 @@ def test_connection_options_and_close(connection, login, password, verify, ca):
     client.close.assert_called_once_with()
 
 
+@pytest.mark.parametrize(
+    "hostname,expected_host",
+    [
+        ("localhost", "localhost"),
+        ("example.invalid", "example.invalid"),
+        ("127.0.0.1", "127.0.0.1"),
+        ("::1", "::1"),
+        ("[::1]", "::1"),
+        ("2001:db8::1234", "2001:db8::1234"),
+        ("[2001:db8::1234]", "2001:db8::1234"),
+        ("::ffff:192.0.2.128", "::ffff:192.0.2.128"),
+    ],
+)
+@pytest.mark.parametrize("scheme", ["http", "https"])
+def test_real_connection_accepts_hostnames_and_ip_literals(
+    hostname, expected_host, scheme
+):
+    # Construct the real client without sending a request or resolving DNS.
+    helper = module.ElasticsearchUtils(hostname, 9243, scheme, "reader", "secret")
+    try:
+        (node,) = helper.es.transport.node_pool.all()
+        assert node.config.host == expected_host
+        assert node.config.port == 9243
+        assert node.config.scheme == scheme
+        assert node.config.verify_certs is True
+    finally:
+        helper.close()
+
+
+@pytest.mark.parametrize(
+    "hostname",
+    ["not:ipv6", "2001:db8:::1", "[::1", "::1]", "[127.0.0.1]"],
+)
+def test_real_connection_still_rejects_invalid_ip_literals(hostname):
+    with pytest.raises(ValueError, match="Could not parse URL"):
+        module.ElasticsearchUtils(hostname, 9200, "http", "", "")
+
+
 @pytest.mark.parametrize("pipeline", ["", "normalize-events"])
 def test_bulk_is_lazy_and_keeps_original_sources_and_sorted_ids(
     connection, monkeypatch, pipeline

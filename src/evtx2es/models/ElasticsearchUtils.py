@@ -22,6 +22,9 @@ class ElasticsearchUtils:
         verify_certs: bool = True,
         ca_certs: str | None = None,
     ) -> None:
+        # IPv6 literals need brackets in URLs; retain the client's URL validation.
+        if ":" in hostname and not hostname.startswith("["):
+            hostname = f"[{hostname}]"
         kwargs = {
             "hosts": [f"{scheme}://{hostname}:{port}"],
             "verify_certs": verify_certs,
