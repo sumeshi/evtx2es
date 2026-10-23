@@ -13,6 +13,7 @@ SHARED_FILES = (
     ".github/collect_runtime_licenses.py",
     ".github/binary_smoke.py",
     ".github/build_binaries.py",
+    ".github/report_pytest.py",
     ".github/workflows/test-elasticsearch.yaml",
     ".devcontainer/Dockerfile",
     ".devcontainer/devcontainer.json",

@@ -36,4 +36,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
       - name: Run tests
-        run: uv run --locked pytest
+        run: uv run --locked pytest --junitxml=reports/pytest.xml
+      - name: Report pytest failures
+        if: always()
+        continue-on-error: true
+        run: uv run --no-sync python .github/report_pytest.py reports/pytest.xml
+      - name: Upload pytest results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: pytest-${{ runner.os }}-python-${{ matrix.python-version }}
+          path: reports/pytest.xml
+          if-no-files-found: ignore
+          retention-days: 7

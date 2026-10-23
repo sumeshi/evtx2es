@@ -58,13 +58,18 @@ jobs:
             --env 'ES_JAVA_OPTS=-Xms512m -Xmx512m' \
             "$ELASTICSEARCH_IMAGE"
           curl --fail --silent --show-error --retry 60 --retry-delay 2 \
-            --retry-connrefused --retry-max-time 180 --connect-timeout 5 --max-time 70 \
+            --retry-connrefused --retry-all-errors --retry-max-time 180 --connect-timeout 5 --max-time 70 \
             "$ELASTICSEARCH_URL/_cluster/health?wait_for_status=yellow&timeout=60s" \
-            > reports/elasticsearch-health.json
+            --output reports/elasticsearch-health.json
           uv run --locked python -c "import json; health=json.load(open('reports/elasticsearch-health.json')); assert not health['timed_out'] and health['status'] in ('yellow', 'green'), health"
 
       - name: Verify native ingestion and mappings
         run: uv run --locked pytest -q tests/test_real_elasticsearch.py --junitxml=reports/elasticsearch-pytest.xml
+
+      - name: Report integration failures
+        if: failure()
+        continue-on-error: true
+        run: uv run --locked python .github/report_pytest.py reports/elasticsearch-pytest.xml
 
       - name: Collect Elasticsearch diagnostics
         if: always()
