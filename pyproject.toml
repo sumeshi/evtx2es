@@ -11,10 +11,10 @@ requires-python = ">=3.13"
 
 dependencies = [
     "elasticsearch==9.5.1",
-    "evtx==0.13.1",
     "orjson==3.13.0",
     "tqdm>=4.70.1",
     "urllib3>=2.8.0",
+    "evtx==0.13.1",
 ]
 
 [build-system]

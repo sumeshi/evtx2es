@@ -24,7 +24,7 @@ def test_datasetdate_reaches_formatter_and_preserves_raw_time(
     tmp_path, monkeypatch, destination, multiprocess
 ):
     model = importlib.import_module("evtx2es.models.Evtx2es")
-    base_view = importlib.import_module("evtx2es.views.BaseView")
+    base_view = importlib.import_module("evtx2es.views.ArtifactOptions")
     source = tmp_path / "synthetic.evtx"
     source.write_bytes(b"synthetic parser input")
     caller_pid = os.getpid()

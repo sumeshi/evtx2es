@@ -25,6 +25,6 @@ services:
     image: kibana:9.5.5
     container_name: evtx2es-kibana
     ports:
-      - 5601:5601
+      - "5601:5601"
     environment:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200

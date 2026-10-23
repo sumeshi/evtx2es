@@ -3,23 +3,37 @@ name: pytest
 on:
   push:
     branches:
+      - master
       - develop
       - 'feature/**'
   pull_request:
     branches:
+      - master
       - develop
+
+permissions:
+  contents: read
 
 jobs:
   pytest:
     name: Run tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHON_CPU_COUNT: '2'
+      PYTHONUTF8: '1'
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ['3.13', '3.14']
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: astral-sh/setup-uv@v10.3.0
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+      - name: Set up Python
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           python-version: ${{ matrix.python-version }}
-      - run: uv sync --locked
-      - run: uv run --locked pytest
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: Run tests
+        run: uv run --locked pytest

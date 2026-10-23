@@ -44,7 +44,7 @@ def test_serial_and_worker_receive_the_same_raw_timedelta(monkeypatch):
 
 
 def test_datasetdate_is_compared_to_a_fixed_utc_clock(monkeypatch):
-    view_module = importlib.import_module("evtx2es.views.BaseView")
+    view_module = importlib.import_module("evtx2es.views.ArtifactOptions")
     from evtx2es.views.Evtx2esView import Evtx2esView
 
     class FixedDateTime(datetime):

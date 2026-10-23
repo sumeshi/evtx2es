@@ -2,22 +2,47 @@ name: publish-binary-pypi
 
 on:
   push:
-    branches:
-      - master
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+env:
+  PACKAGE: evtx2es
+  PYTHON_VERSION: '3.13'
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v7.0.1
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
 
-    - name: Set up Python
-      uses: astral-sh/setup-uv@v10.3.0
-      with:
-        python-version: '3.13'
+      - name: Set up Python
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: Build and publish
-      run: |
-        uv build
-        uv publish --token ${{secrets.PYPI_TOKEN}}
+      - name: Install dependencies
+        run: uv sync --locked
 
+      - name: Validate release version
+        run: |
+          version=$(uv run --locked python -c "from importlib.metadata import version; print(version('$PACKAGE'))")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package version $version"
+            exit 1
+          fi
+        shell: bash
+
+      - name: Run tests
+        run: uv run --locked pytest
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish package
+        run: uv publish --token "$UV_PUBLISH_TOKEN"
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}

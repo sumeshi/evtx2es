@@ -2,82 +2,96 @@ name: publish-release
 
 on:
   push:
-    branches:
-      - master
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
+env:
+  PACKAGE: evtx2es
+  JSON_COMMAND: evtx2json
+  PYTHON_VERSION: '3.13'
+  NUITKA_EXTRA_ARGS: ''
+  PYTHON_CPU_COUNT: '2'
+  PYTHONUTF8: '1'
+
 jobs:
   build-windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     outputs:
-      version: ${{ steps.create_tag.outputs.version }}
-    strategy:
-      matrix:
-        python-version: ['3.13']
+      version: ${{ steps.release_version.outputs.version }}
     steps:
-      - name: checkout
+      - name: Checkout
         uses: actions/checkout@v7.0.1
 
-      - name: install python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: astral-sh/setup-uv@v10.3.0
         with:
-          python-version: ${{ matrix.python-version }}
-      
-      - name: Install dependencies
-        run: |
-          uv sync --locked
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: run python
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Validate release version
+        id: release_version
         run: |
-          uv run --locked evtx2es -h
-          uv run --locked evtx2json -h
-      
+          version=$(uv run --locked python -c "from importlib.metadata import version; print(version('$PACKAGE'))")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package version $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        run: uv run --locked pytest
+
+      - name: Verify Python commands
+        run: |
+          uv run --locked "$PACKAGE" --help
+          uv run --locked "$PACKAGE" --version
+          uv run --locked "$JSON_COMMAND" --help
+          uv run --locked "$JSON_COMMAND" --version
+
+      - name: Prepare native validation
+        run: uv run --locked python .github/binary_smoke.py prepare
+
       - name: Collect runtime licenses
         run: uv run --locked python .github/collect_runtime_licenses.py dist/LICENSES.txt
 
-      - name: build
-        run: |
-          uv run --locked python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2es.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
-          uv run --locked python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2json.exe --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
-      
-      - name: verify
-        run: |
-          dist/evtx2es.exe --version
-          dist/evtx2json.exe --version
-      
-      - name: create tag
-        id: create_tag
-        if: startsWith(github.ref, 'refs/heads/master')
-        run: |
-          version=$(grep '__version__' src/evtx2es/__about__.py | awk -F '"' '{print $2}')
-          git tag "v$version"
-          git push origin "v$version"
-          echo "version=$version" >> $GITHUB_OUTPUT
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
+      - name: Build binaries
+        run: uv run --locked python .github/build_binaries.py
 
-      - name: rename asset
-        if: startsWith(github.ref, 'refs/heads/master')
+      - name: Verify binaries
+        run: uv run --locked python .github/binary_smoke.py verify
+
+      - name: Upload binary validation logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: binary-validation-windows
+          path: dist/validation/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Bundle release assets
         run: |
-          bundle="dist/evtx2es-windows-x64-v${{ steps.create_tag.outputs.version }}"
+          bundle="dist/$PACKAGE-windows-x64-v${{ steps.release_version.outputs.version }}"
           mkdir -p "$bundle"
-          mv dist/evtx2es.exe "$bundle/evtx2es.exe"
-          mv dist/evtx2json.exe "$bundle/evtx2json.exe"
+          mv "dist/$PACKAGE.exe" "$bundle/$PACKAGE.exe"
+          mv "dist/$JSON_COMMAND.exe" "$bundle/$JSON_COMMAND.exe"
           cp dist/LICENSES.txt "$bundle/LICENSES.txt"
           uv run --locked python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
-        shell: bash
 
-      - name: create release
+      - name: Create release
         uses: softprops/action-gh-release@v3.0.3
-        if: startsWith(github.ref, 'refs/heads/master')
         with:
-          tag_name: v${{ steps.create_tag.outputs.version }}
-          files: |
-            dist/evtx2es-windows-x64-v${{ steps.create_tag.outputs.version }}.zip
-          name: Release v${{ steps.create_tag.outputs.version }}
+          tag_name: v${{ steps.release_version.outputs.version }}
+          files: dist/${{ env.PACKAGE }}-windows-x64-v${{ steps.release_version.outputs.version }}.zip
+          name: Release v${{ steps.release_version.outputs.version }}
           body: 'This release was automatically created by GitHub Actions.'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -85,58 +99,70 @@ jobs:
   build-linux:
     needs: build-windows
     runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        python-version: ['3.13']
+    defaults:
+      run:
+        shell: bash
     steps:
-      - name: checkout
+      - name: Checkout
         uses: actions/checkout@v7.0.1
 
-      - name: install python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: astral-sh/setup-uv@v10.3.0
         with:
-          python-version: ${{ matrix.python-version }}
-      
-      - name: Install dependencies
-        run: |
-          sudo apt install patchelf
-          uv sync --locked
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: run python
+      - name: Install system dependencies
         run: |
-          uv run --locked evtx2es -h
-          uv run --locked evtx2json -h
+          sudo apt-get update
+          sudo apt-get install -y patchelf
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Run tests
+        run: uv run --locked pytest
+
+      - name: Verify Python commands
+        run: |
+          uv run --locked "$PACKAGE" --help
+          uv run --locked "$PACKAGE" --version
+          uv run --locked "$JSON_COMMAND" --help
+          uv run --locked "$JSON_COMMAND" --version
+
+      - name: Prepare native validation
+        run: uv run --locked python .github/binary_smoke.py prepare
 
       - name: Collect runtime licenses
         run: uv run --locked python .github/collect_runtime_licenses.py dist/LICENSES.txt
 
-      - name: build
-        run: |
-          uv run --locked python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2es --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2esView.py
-          uv run --locked python -m nuitka --standalone --onefile --follow-imports --include-distribution-metadata=evtx2es --enable-plugin=multiprocessing --no-deployment-flag=self-execution -o evtx2json --output-dir=dist --assume-yes-for-downloads src/evtx2es/views/Evtx2jsonView.py
-      
-      - name: verify
-        run: |
-          dist/evtx2es --version
-          dist/evtx2json --version
+      - name: Build binaries
+        run: uv run --locked python .github/build_binaries.py
 
-      - name: rename asset
-        if: startsWith(github.ref, 'refs/heads/master')
+      - name: Verify binaries
+        run: uv run --locked python .github/binary_smoke.py verify
+
+      - name: Upload binary validation logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: binary-validation-linux
+          path: dist/validation/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Bundle release assets
         run: |
-          bundle="dist/evtx2es-linux-x64-v${{ needs.build-windows.outputs.version }}"
+          bundle="dist/$PACKAGE-linux-x64-v${{ needs.build-windows.outputs.version }}"
           mkdir -p "$bundle"
-          mv dist/evtx2es "$bundle/evtx2es"
-          mv dist/evtx2json "$bundle/evtx2json"
+          mv "dist/$PACKAGE" "$bundle/$PACKAGE"
+          mv "dist/$JSON_COMMAND" "$bundle/$JSON_COMMAND"
           cp dist/LICENSES.txt "$bundle/LICENSES.txt"
           uv run --locked python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
-        shell: bash
 
-      - name: upload asset to release
-        if: startsWith(github.ref, 'refs/heads/master')
+      - name: Upload asset to release
         uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: v${{ needs.build-windows.outputs.version }}
-          files: |
-            dist/evtx2es-linux-x64-v${{ needs.build-windows.outputs.version }}.zip
+          files: dist/${{ env.PACKAGE }}-linux-x64-v${{ needs.build-windows.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

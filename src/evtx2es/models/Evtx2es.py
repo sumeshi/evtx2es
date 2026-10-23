@@ -2,15 +2,15 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Generator, Iterable, Union, Any, Optional, Sequence, Callable
-import multiprocessing as mp
-import sys
-import os
-from collections import deque
 import logging
 import re
 
 import orjson
 from evtx import PyEvtxParser
+
+from .MultiprocessingUtils import SafeMultiprocessingMixin
+from .MultiprocessingUtils import mp as mp
+from .MultiprocessingUtils import ordered_pool_results
 
 
 MAX_CONSECUTIVE_PARSE_ERRORS = 100
@@ -57,32 +57,6 @@ def normalize_tags(
         if tag not in result:
             result.append(tag)
     return result
-
-
-class SafeMultiprocessingMixin:
-    """Safe multiprocessing management class for Python 3.13 compatibility"""
-
-    @staticmethod
-    def get_multiprocessing_context() -> mp.context:
-        """Get safe multiprocessing context"""
-        # Use spawn for Python 3.13+ or test environments to avoid fork() issues
-        if sys.version_info >= (3, 13) or "pytest" in sys.modules:
-            try:
-                ctx = mp.get_context("spawn")
-            except RuntimeError:
-                ctx = mp.get_context()
-        else:
-            ctx = mp.get_context()
-
-        return ctx
-
-    @staticmethod
-    def get_cpu_count() -> int:
-        """Get CPU count safely"""
-        try:
-            return mp.cpu_count()
-        except NotImplementedError:
-            return os.cpu_count() or 1
 
 
 def generate_chunks(
@@ -513,26 +487,17 @@ class Evtx2es(SafeMultiprocessingMixin):
             ctx = self.get_multiprocessing_context()
             worker_count = max(1, self.get_cpu_count())
             with ctx.Pool(worker_count) as pool:
-                pending = deque()
-                max_pending = worker_count * 2
-                # Consume the PyO3-backed iterator here, on the caller thread. Only
-                # materialized Python chunks cross into multiprocessing workers.
-                for chunk in generate_chunks(
-                    chunk_size, self.parser.records_json(), self._record_parse_error
-                ):
-                    pending.append(
-                        pool.apply_async(
-                            _mp_worker,
-                            ((chunk, str(self.path), shift, additional_tags),),
-                        )
+                # Advance the native iterator on this thread; only materialized
+                # Python chunks are handed to the shared submission helper.
+                tasks = (
+                    (chunk, str(self.path), shift, additional_tags)
+                    for chunk in generate_chunks(
+                        chunk_size, self.parser.records_json(), self._record_parse_error
                     )
-                    if len(pending) >= max_pending:
-                        formatted, diagnostics = pending.popleft().get()
-                        self.diagnostics.extend(diagnostics)
-                        if formatted:
-                            yield formatted
-                while pending:
-                    formatted, diagnostics = pending.popleft().get()
+                )
+                for formatted, diagnostics in ordered_pool_results(
+                    pool, _mp_worker, tasks, worker_count * 2
+                ):
                     self.diagnostics.extend(diagnostics)
                     if formatted:
                         yield formatted

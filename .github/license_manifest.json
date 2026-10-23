@@ -1,0 +1,27 @@
+{
+  "project_name": "evtx2es",
+  "standalone_distributions": [
+    "sniffio",
+    "idna",
+    "anyio",
+    "typing-extensions",
+    "six",
+    "python-dateutil",
+    "certifi",
+    "elastic-transport",
+    "elasticsearch",
+    "evtx",
+    "orjson",
+    "tqdm",
+    "urllib3"
+  ],
+  "notices": [],
+  "license_files": [],
+  "fallbacks": [
+    {
+      "distribution": "evtx",
+      "version": "0.13.1",
+      "path": "LICENSES/evtx-0.13.1.txt"
+    }
+  ]
+}

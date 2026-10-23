@@ -1,9 +1,10 @@
 # coding: utf-8
 import argparse
 from abc import ABCMeta, abstractmethod
-from datetime import datetime, timezone
+from typing import List, Optional
 
-from evtx2es.__about__ import __version__
+from ..__about__ import __version__
+from .ArtifactOptions import ArtifactOptions
 
 
 def positive_int(value: str) -> int:
@@ -13,68 +14,38 @@ def positive_int(value: str) -> int:
     return number
 
 
-class BaseView(metaclass=ABCMeta):
-
+class BaseView(ArtifactOptions, metaclass=ABCMeta):
     def __init__(self):
         self.parser = argparse.ArgumentParser(allow_abbrev=False)
         self.__define_common_options()
+        self._define_artifact_options()
 
     def __define_common_options(self):
         self.parser.add_argument(
             "--version", "-v", action="version", version=__version__
         )
         self.parser.add_argument(
-            "--quiet",
-            "-q",
-            action="store_true",
-            help="Suppress standard output.",
+            "--quiet", "-q", action="store_true", help="Suppress standard output."
         )
-        self.parser.add_argument(
-            "--multiprocess",
-            "-m",
-            action="store_true",
-            help="Enable multiprocessing.",
-        )
+        if self.supports_multiprocessing:
+            self.parser.add_argument(
+                "--multiprocess",
+                "-m",
+                action="store_true",
+                help="Enable multiprocessing.",
+            )
         self.parser.add_argument(
             "--size",
             "-s",
             type=positive_int,
             default=500,
-            help="Number of records to process in each chunk.",
+            help="Batch size (default: 500).",
         )
         self.parser.add_argument(
             "--tags",
             default="",
-            help=(
-                "Comma-separated tags to add to each record "
-                "(e.g., hostname, domain name)."
-            ),
+            help="Comma-separated tags to add to each record.",
         )
-        self.parser.add_argument(
-            "--datasetdate",
-            default=None,
-            help=(
-                "Shift timestamps based on the latest record's TimeCreated value "
-                "(MM/DD/YYYY.HH:MM:SS, interpreted as UTC)."
-            ),
-        )
-
-    def get_shift_and_tags(self):
-        # shift timestamp
-        if getattr(self.args, "datasetdate", None) is not None:
-            dataset_date = datetime.strptime(self.args.datasetdate, "%m/%d/%Y.%H:%M:%S")
-            shift = datetime.now(timezone.utc) - dataset_date.replace(tzinfo=timezone.utc)
-        else:
-            shift = None
-
-        # Parse tags
-        additional_tags = None
-        if getattr(self.args, "tags", ""):
-            additional_tags = [
-                tag.strip() for tag in self.args.tags.split(",") if tag.strip()
-            ]
-
-        return shift, additional_tags
 
     @abstractmethod
     def define_options(self):
@@ -165,3 +136,10 @@ class BaseView(metaclass=ABCMeta):
     def log(self, message: str, is_quiet: bool):
         if not is_quiet:
             print(message)
+
+    def parse_tags(self) -> Optional[List[str]]:
+        """Parse the common comma-separated tag option."""
+        if not self.args.tags:
+            return None
+        tags = [tag.strip() for tag in self.args.tags.split(",")]
+        return [tag for tag in tags if tag]

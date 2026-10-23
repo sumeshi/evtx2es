@@ -1,0 +1,19 @@
+{
+  "fixture": "security-three-records.bin",
+  "source_repository": "JPCERTCC/LogonTracer",
+  "source_commit": "638c1a4e6095cbf530ada057e7403ff8636f601c",
+  "source_path": "sample/Security.evtx",
+  "source_url": "https://github.com/JPCERTCC/LogonTracer/blob/638c1a4e6095cbf530ada057e7403ff8636f601c/sample/Security.evtx",
+  "source_git_blob_sha1": "a3b53a2d0e5a4a88c539ed59886d9c98f8fba1fa",
+  "source_sha256": "b3f8498d8a99740f7381518fd332cbb67c0bfed0a5b4320d407e485b3ee682fb",
+  "fixture_sha256": "9368418b6d2264e98cd5da8772bc80d7be43c784f93ba163de25a44a7a77fd1d",
+  "license_file": "LICENSE-LogonTracer.txt",
+  "license_source_url": "https://github.com/JPCERTCC/LogonTracer/blob/638c1a4e6095cbf530ada057e7403ff8636f601c/LICENSE.txt",
+  "license_scope": "Root repository license supplied as attribution; no separate artifact-specific license notice was found.",
+  "changes": [
+    "First chunk retained with only the first three records.",
+    "Two SubjectLogonId substitution types changed from HexInt64 to UInt64, set to 2**63 and 2**64-1.",
+    "Unused record area zeroed; file/chunk counts and CRCs recomputed."
+  ],
+  "origin": "Derived Windows-captured sample; UInt64 boundary values were not captured on Windows."
+}
