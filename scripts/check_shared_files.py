@@ -108,7 +108,6 @@ def main():
         compare(template, REPOSITORIES)
     for template in MP_FILES:
         compare(template, REPOSITORIES[:3])
-    compare("src/{package}/models/ElasticsearchAdapter.py", ("evtx2es", "prefetch2es"))
     compare("src/{package}/views/ArtifactOptions.py", ("mft2es", "prefetch2es"))
     compare(".devcontainer/docker-compose.yaml", REPOSITORIES, normalize_package=True)
     if failures:

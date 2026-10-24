@@ -165,9 +165,14 @@ def _create_timestamp_field(system_time: str, shift: Optional[timedelta]) -> str
 def _normalize_field_value(key: str, value) -> Any:
     """Normalize specific field values for ProcessId and numeric ranges."""
     if key == "Status":
-        # Preserve the existing mapping-compatible null; the caller keeps its
-        # original value separately as lossless JSON text.
-        return None
+        # Keep codes directly searchable, including their spelling and case.
+        # Other JSON types use JSON notation rather than Python's str/repr.
+        # The caller retains typed JSON separately to distinguish e.g. 0/"0".
+        return (
+            value
+            if isinstance(value, str)
+            else orjson.dumps(value, option=orjson.OPT_SORT_KEYS).decode("utf-8")
+        )
 
     if key == "Reason":
         return str(value)
@@ -195,7 +200,7 @@ def _normalize_field_value(key: str, value) -> Any:
 def _create_normalized_event_data(
     event_data: dict, original_values: Optional[dict] = None
 ) -> dict:
-    """Retain clamped integers as decimal text and Status as typed JSON text."""
+    """Normalize search values and retain clamped integers and typed Status."""
     if not event_data or len(event_data) == 0:
         return {}
 
