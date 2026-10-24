@@ -139,7 +139,11 @@ def test_status_changes_ids_from_the_legacy_null_without_changing_originals():
     )
 
 
-@pytest.mark.parametrize("status", ["😀" * 9000, {"Message": "失敗" * 10000}])
+@pytest.mark.parametrize(
+    "status",
+    ["😀" * 9000, {"Message": "失敗" * 10000}],
+    ids=["long-string", "long-object"],
+)
 def test_long_status_is_not_truncated_in_json_outputs(status):
     document = format_record(raw_record({"Status": status}), "sample.evtx", None)
 

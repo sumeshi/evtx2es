@@ -318,6 +318,13 @@ def run_status_cases(client, transport, new_index, stored_documents, document_id
             name=template, index_patterns=[index], template={"mappings": mappings}
         )
         try:
+            if label == "nested":
+                # An explicit object in the adapter's create body can override
+                # the template's nested type. Materialize the inherited nested
+                # mapping first so this case exercises an actually nested index.
+                client.indices.create(index=index)
+                inherited = client.indices.get_mapping(index=index)[index]["mappings"]
+                assert inherited["properties"]["winlog"]["type"] == "nested"
             try:
                 transport.bulk_indice(documents, index)
             except Exception as error:
