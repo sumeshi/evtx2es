@@ -146,6 +146,27 @@ def status_properties(mapping):
     ]
 
 
+def status_search_mapping(status=None):
+    """Test operator setup; the importer must not provision this mapping."""
+    return {
+        "properties": {
+            "winlog": {
+                "properties": {
+                    "event_data": {
+                        "properties": {
+                            "Status": (
+                                deepcopy(status)
+                                if status is not None
+                                else {"type": "keyword", "ignore_above": 8191}
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
 def run_status_cases(client, transport, new_index, stored_documents, document_id, raw):
     documents = status_documents(raw)
     original = deepcopy(documents)
@@ -156,25 +177,17 @@ def run_status_cases(client, transport, new_index, stored_documents, document_id
     assert document_id(documents[4]) == document_id(documents[5])  # "0" / 0
     assert document_id(documents[7]) == document_id(documents[10])  # false / "false"
     assert document_id(documents[9]) == document_id(documents[11])  # null / "null"
-    # Explicit keyword mappings must defeat both date and numeric detection,
-    # regardless of which provider/type reaches an initially empty index first.
+    # The operator supplies keyword mappings before importing. Test both date
+    # and numeric detection with different provider/type arrival orders.
     for first in (0, 5, 15):
         index = new_index(f"status-shapes-{first}")
-        client.indices.create(
-            index=index,
-            mappings={
-                "numeric_detection": True,
-                "properties": {
-                    "winlog": {
-                        "properties": {
-                            "event_data_original": {
-                                "properties": {"Counter": {"type": "keyword"}}
-                            }
-                        }
-                    }
-                },
-            },
-        )
+        mappings = status_search_mapping()
+        mappings["numeric_detection"] = True
+        mappings["properties"]["winlog"]["properties"]["event_data_original"] = {
+            "properties": {"Counter": {"type": "keyword"}}
+        }
+        client.indices.create(index=index, mappings=mappings)
+        before = client.indices.get_mapping(index=index)[index]["mappings"]
         ordered = documents[first:] + documents[:first]
         assert transport.bulk_indice(iter(ordered), index) == (len(documents), [])
         actual = stored_documents(client, index)
@@ -184,14 +197,15 @@ def run_status_cases(client, transport, new_index, stored_documents, document_id
             winlog = actual[document_id(document)]["winlog"]
             assert winlog["event_data"]["Status"] == text
             assert winlog["event_data_original"] == {"Counter": str(2**64 - 1)}
-        mapping = client.indices.get_mapping(index=index)[index]["mappings"]
-        assert status_properties(mapping) == {
-            "type": "keyword",
-            "ignore_above": 8191,
-        }
+        after = client.indices.get_mapping(index=index)[index]["mappings"]
+        assert (
+            status_properties(after)
+            == status_properties(before)
+            == {"type": "keyword", "ignore_above": 8191}
+        )
         assert (
             "Status"
-            not in mapping["properties"]["winlog"]["properties"]["event_data_original"][
+            not in after["properties"]["winlog"]["properties"]["event_data_original"][
                 "properties"
             ]
         )
@@ -199,8 +213,8 @@ def run_status_cases(client, transport, new_index, stored_documents, document_id
             client, index, "winlog.event_data.Status", expected.values()
         )
 
-    # Legacy null made no field mapping. Retain the old source/document ID and
-    # add a keyword field for new records, without silently replacing old data.
+    # Legacy null made no field mapping. The operator explicitly provisions the
+    # search field before importing new records; old documents remain intact.
     index = new_index("status-legacy-null")
     legacy = deepcopy(documents[3])
     legacy["winlog"]["event_data"]["Status"] = None
@@ -210,6 +224,9 @@ def run_status_cases(client, transport, new_index, stored_documents, document_id
         "Status"
         not in before["properties"]["winlog"]["properties"]["event_data"]["properties"]
     )
+    client.indices.put_mapping(
+        index=index, properties=status_search_mapping()["properties"]
+    )
     assert transport.bulk_indice(documents, index) == (len(documents), [])
     actual = stored_documents(client, index)
     assert actual[document_id(legacy)] == legacy
@@ -217,90 +234,84 @@ def run_status_cases(client, transport, new_index, stored_documents, document_id
     assert document_id(legacy) != document_id(documents[3])
     assert_status_search(client, index, "winlog.event_data.Status", expected.values())
 
-    # Existing text mappings remain text. Exact search uses their keyword
-    # multifield; adding one does not retroactively index legacy documents.
+    # Existing text mappings and their operator-defined multifields stay intact.
+    # Exact queries use the keyword multifield; the importer must not add one.
     index = new_index("status-legacy-text")
-    client.indices.create(
-        index=index,
-        mappings={
-            "properties": {
-                "winlog": {
-                    "properties": {
-                        "event_data": {
-                            "properties": {
-                                "Status": {"type": "text", "analyzer": "whitespace"}
-                            }
-                        },
-                        "event_data_original": {
-                            "properties": {
-                                "Status": {"type": "text", "analyzer": "whitespace"}
-                            }
-                        },
-                    }
-                }
-            }
-        },
-    )
+    text = {
+        "type": "text",
+        "analyzer": "whitespace",
+        "fields": {"keyword": {"type": "keyword", "ignore_above": 8191}},
+    }
+    mappings = status_search_mapping(text)
+    mappings["properties"]["winlog"]["properties"]["event_data_original"] = {
+        "properties": {"Status": {"type": "text", "analyzer": "whitespace"}}
+    }
+    client.indices.create(index=index, mappings=mappings)
+    before = client.indices.get_mapping(index=index)[index]["mappings"]
     assert transport.bulk_indice(documents, index) == (len(documents), [])
-    actual = stored_documents(client, index)
-    assert actual == {document_id(document): document for document in documents}
-    mapping = client.indices.get_mapping(index=index)[index]["mappings"]
-    assert status_properties(mapping)["type"] == "text"
-    assert status_properties(mapping)["analyzer"] == "whitespace"
-    assert status_properties(mapping)["fields"]["keyword"]["type"] == "keyword"
-    assert mapping["properties"]["winlog"]["properties"]["event_data_original"][
-        "properties"
-    ]["Status"] == {"type": "text", "analyzer": "whitespace"}
+    assert stored_documents(client, index) == expected
+    after = client.indices.get_mapping(index=index)[index]["mappings"]
+    assert status_properties(after) == status_properties(before) == text
+    assert (
+        after["properties"]["winlog"]["properties"]["event_data_original"][
+            "properties"
+        ]["Status"]
+        == before["properties"]["winlog"]["properties"]["event_data_original"][
+            "properties"
+        ]["Status"]
+    )
     assert_status_search(
         client, index, "winlog.event_data.Status.keyword", expected.values()
     )
 
-    # Old numeric/date/object search mappings cannot become keyword in place.
-    # Reject before bulk instead of coercing a code or dropping a source value.
-    for kind in ("long", "date", "object"):
-        index = new_index(f"status-incompatible-{kind}")
-        client.indices.create(
-            index=index,
-            mappings={
-                "properties": {
-                    "winlog": {
-                        "properties": {
-                            "event_data": {"properties": {"Status": {"type": kind}}}
-                        }
-                    }
-                }
-            },
-        )
-        before = client.indices.get_mapping(index=index)[index]["mappings"]
-        try:
-            transport.bulk_indice(documents, index)
-        except Exception as error:
-            assert "Status" in str(error) and "new index" in str(error).lower(), str(
-                error
-            )
-        else:
-            raise AssertionError(f"Accepted incompatible event_data.Status {kind}")
-        assert client.count(index=index)["count"] == 0
-        assert client.indices.get_mapping(index=index)[index]["mappings"] == before
+    # An incompatible object mapping is an ordinary Bulk item failure. There
+    # is no adapter-side schema validation or repair before sending the records.
+    index = new_index("status-incompatible-object")
+    client.indices.create(
+        index=index, mappings=status_search_mapping({"type": "object"})
+    )
+    before = client.indices.get_mapping(index=index)[index]["mappings"]
+    rejected = {"winlog": {"event_data": {"Status": "0xc000013a"}}}
+    healthy = [{"ordinal": 1}, {"ordinal": 2}]
+    batch = [healthy[0], rejected, healthy[1]]
+    before_batch = deepcopy(batch)
+    success, failures = transport.bulk_indice(batch, index)
+    assert success == 2 and len(failures) == 1
+    assert failures[0]["index"]["status"] == 400
+    assert failures[0]["index"]["_id"] == document_id(rejected)
+    assert stored_documents(client, index) == {
+        document_id(document): document for document in healthy
+    }
+    after = client.indices.get_mapping(index=index)[index]["mappings"]
+    assert status_properties(after) == status_properties(before) == {"type": "object"}
+    assert batch == before_batch and documents == original
 
-    # Historical Status originals are no longer written or validated. Their old
-    # mapping must not block new records or be changed by preparing Status.
+    # Strings alone do not prevent dynamic date detection. Without an operator
+    # mapping, a date-like first Status can make a later NTSTATUS fail in Bulk.
+    index = new_index("status-dynamic-date")
+    client.indices.create(index=index, mappings={"date_detection": True})
+    first, later = documents[:2]
+    assert transport.bulk_indice([first], index) == (1, [])
+    before = client.indices.get_mapping(index=index)[index]["mappings"]
+    assert status_properties(before)["type"] == "date"
+    success, failures = transport.bulk_indice([later], index)
+    assert success == 0 and len(failures) == 1
+    assert failures[0]["index"]["status"] == 400
+    assert failures[0]["index"]["_id"] == document_id(later)
+    assert stored_documents(client, index) == {document_id(first): first}
+    after = client.indices.get_mapping(index=index)[index]["mappings"]
+    assert after == before
+    assert documents == original
+
+    # Historical original.Status fields are not written or managed. Their old
+    # mapping must not block new records or change during a successful import.
     for kind in ("long", "date", "object"):
         index = new_index(f"status-legacy-original-{kind}")
-        client.indices.create(
-            index=index,
-            mappings={
-                "properties": {
-                    "winlog": {
-                        "properties": {
-                            "event_data_original": {
-                                "properties": {"Status": {"type": kind}}
-                            }
-                        }
-                    }
-                }
-            },
-        )
+        mappings = status_search_mapping()
+        mappings["properties"]["winlog"]["properties"]["event_data_original"] = {
+            "properties": {"Status": {"type": kind}}
+        }
+        client.indices.create(index=index, mappings=mappings)
         before = client.indices.get_mapping(index=index)[index]["mappings"]
         assert transport.bulk_indice(documents, index) == (len(documents), [])
         assert stored_documents(client, index) == expected
@@ -313,13 +324,15 @@ def run_status_cases(client, transport, new_index, stored_documents, document_id
                 "properties"
             ]["Status"]
         )
+        assert status_properties(after) == status_properties(before)
         assert_status_search(
             client, index, "winlog.event_data.Status", expected.values()
         )
 
-    # Keyword length limits must never reject the whole DFIR record or truncate
-    # the source value. Long values are retained but omitted from the index.
+    # The operator's ignore_above setting avoids rejecting an entire record for
+    # a huge keyword term. The importer does not truncate the source value.
     index = new_index("status-long")
+    client.indices.create(index=index, mappings=status_search_mapping())
     long_documents = []
     for status in ("😀" * 9000, {"Message": "失敗" * 10000}):
         event = json.loads(raw["data"])
@@ -348,39 +361,6 @@ def run_status_cases(client, transport, new_index, stored_documents, document_id
             value == status if isinstance(status, str) else json.loads(value) == status
         )
 
-    # A new index can inherit disabled/nested objects from a user template.
-    # Check the created mapping rather than trusting the create request alone.
-    for label, mappings in (
-        ("disabled", {"enabled": False}),
-        ("nested", {"properties": {"winlog": {"type": "nested"}}}),
-    ):
-        index = new_index(f"status-template-{label}")
-        template = index
-        client.indices.put_index_template(
-            name=template, index_patterns=[index], template={"mappings": mappings}
-        )
-        try:
-            if label == "nested":
-                # An explicit object in the adapter's create body can override
-                # the template's nested type. Materialize the inherited nested
-                # mapping first so this case exercises an actually nested index.
-                client.indices.create(index=index)
-                inherited = client.indices.get_mapping(index=index)[index]["mappings"]
-                assert inherited["properties"]["winlog"]["type"] == "nested"
-            try:
-                transport.bulk_indice(documents, index)
-            except Exception as error:
-                assert (
-                    "incompatible" in str(error) and "new index" in str(error).lower()
-                ), str(error)
-            else:
-                raise AssertionError(
-                    f"Accepted {label} mapping inherited from template"
-                )
-            assert client.count(index=index)["count"] == 0
-        finally:
-            client.indices.delete_index_template(name=template)
-
 
 def run_native_status_cases(
     client, transport, new_index, stored_documents, document_id
@@ -393,6 +373,8 @@ def run_native_status_cases(
             documents = evtx2json(str(source), multiprocess=multiprocess, chunk_size=1)
             assert len(documents) == len(fixture["STATUSES"])
             index = new_index(f"status-native-{multiprocess}".lower())
+            client.indices.create(index=index, mappings=status_search_mapping())
+            before_mapping = client.indices.get_mapping(index=index)[index]["mappings"]
             assert transport.bulk_indice(documents, index) == (len(documents), [])
             actual = stored_documents(client, index)
             assert actual == {document_id(doc): doc for doc in documents}
@@ -413,4 +395,6 @@ def run_native_status_cases(
                 assert isinstance(winlog["event_data"]["Status"], str)
                 assert "event_data_original" not in winlog
             assert_status_search(client, index, "winlog.event_data.Status", documents)
+            after_mapping = client.indices.get_mapping(index=index)[index]["mappings"]
+            assert status_properties(after_mapping) == status_properties(before_mapping)
         assert sha256(source.read_bytes()).hexdigest() == before

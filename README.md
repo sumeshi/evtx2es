@@ -26,6 +26,10 @@ from evtx2es import evtx2es
 evtx2es('/path/to/your/file.evtx')
 ```
 
+Elasticsearch dynamic mapping can cause type conflicts between events. Define the
+destination index and mappings in advance when needed; evtx2es only sends bulk
+requests and does not manage indices or mappings.
+
 
 ### Arguments
 
