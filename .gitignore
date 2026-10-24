@@ -106,4 +106,7 @@ venv.bak/
 # evtx2es
 *.evtx
 
+GOAL.md
 TASKS.md
+.serena
+.tokensave
