@@ -167,7 +167,6 @@ def _normalize_field_value(key: str, value) -> Any:
     if key == "Status":
         # Keep codes directly searchable, including their spelling and case.
         # Other JSON types use JSON notation rather than Python's str/repr.
-        # The caller retains typed JSON separately to distinguish e.g. 0/"0".
         return (
             value
             if isinstance(value, str)
@@ -200,7 +199,7 @@ def _normalize_field_value(key: str, value) -> Any:
 def _create_normalized_event_data(
     event_data: dict, original_values: Optional[dict] = None
 ) -> dict:
-    """Normalize search values and retain clamped integers and typed Status."""
+    """Normalize search values and retain clamped integers as decimal text."""
     if not event_data or len(event_data) == 0:
         return {}
 
@@ -208,15 +207,7 @@ def _create_normalized_event_data(
     for k, v in event_data.items():
         normalized = _normalize_field_value(k, v)
         normalized_data[k] = normalized
-        if original_values is not None and k == "Status":
-            # Status can be a scalar, object or list across event providers.
-            # One text type avoids reintroducing its Elasticsearch mapping
-            # conflicts, while JSON decoding restores the original value/type.
-            # Sorted object keys keep IDs independent of insertion order.
-            original_values[k] = orjson.dumps(v, option=orjson.OPT_SORT_KEYS).decode(
-                "utf-8"
-            )
-        elif (
+        if (
             original_values is not None
             and type(v) is int
             and type(normalized) is int
@@ -267,7 +258,7 @@ def format_record(
                 "provider": {"name": str, "guid": str},
                 "event_data": dict (optional),
                 "event_data_original": dict (optional, clamped integers as
-                    decimal text and Status as JSON text)
+                    decimal text)
             },
             "userdata": dict (optional),
             "process": {"pid": int, "thread": {"id": int}} (optional),

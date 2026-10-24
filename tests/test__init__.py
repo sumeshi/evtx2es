@@ -21,7 +21,7 @@ def assert_native_status_is_preserved(records):
     for record_id, status in ((246692, "0x20"), (227432, "0xc000013a")):
         winlog = by_id[record_id]["winlog"]
         assert winlog["event_data"]["Status"] == status
-        assert orjson.loads(winlog["event_data_original"]["Status"]) == status
+        assert "Status" not in winlog.get("event_data_original", {})
 
 
 # command-line test cases

@@ -38,8 +38,7 @@ def assert_status_documents(documents):
         )
         assert winlog["event_data"]["Status"] == expected
         assert type(winlog["event_data"]["Status"]) is str
-        restored = json.loads(winlog["event_data_original"]["Status"])
-        assert restored == status and type(restored) is type(status)
+        assert "event_data_original" not in winlog
 
 
 def test_synthetic_fixture_checksums_and_native_status_types(tmp_path):
@@ -63,7 +62,7 @@ def test_synthetic_fixture_checksums_and_native_status_types(tmp_path):
 
 @pytest.mark.parametrize("multiprocess", [False, True])
 @pytest.mark.parametrize("chunk_size", [1, 500])
-def test_native_status_api_preserves_search_values_and_typed_originals(
+def test_native_status_api_preserves_search_values_without_a_status_sidecar(
     tmp_path, monkeypatch, multiprocess, chunk_size
 ):
     source = FIXTURE["create_artifact"](tmp_path)
@@ -79,7 +78,7 @@ def test_native_status_api_preserves_search_values_and_typed_originals(
 @pytest.mark.parametrize("output_format", ["json", "jsonl"])
 @pytest.mark.parametrize("multiprocess", [False, True])
 @pytest.mark.parametrize("chunk_size", [1, 500])
-def test_native_status_cli_preserves_search_values_and_typed_originals(
+def test_native_status_cli_preserves_search_values_without_a_status_sidecar(
     tmp_path, output_format, multiprocess, chunk_size
 ):
     source = FIXTURE["create_artifact"](tmp_path)

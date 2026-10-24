@@ -1,4 +1,4 @@
-"""Status is searchable text with a reversible, typed JSON original."""
+"""Status is searchable text without a duplicate original field."""
 
 from copy import deepcopy
 import json
@@ -65,17 +65,17 @@ def raw_record(event_data):
         ([], "[]"),
     ],
 )
-def test_status_search_text_and_original_value_and_type(status, expected):
+def test_status_search_text_without_an_original_duplicate(status, expected):
     record = raw_record({"Status": status})
     before = deepcopy(record)
 
     document = format_record(record, "sample.evtx", None)
 
     assert document["winlog"]["event_data"] == {"Status": expected}
-    original = document["winlog"]["event_data_original"]["Status"]
-    assert isinstance(original, str)
-    restored = json.loads(original)
-    assert restored == status and type(restored) is type(status)
+    assert "event_data_original" not in document["winlog"]
+    if not isinstance(status, str):
+        restored = json.loads(document["winlog"]["event_data"]["Status"])
+        assert restored == status
     if type(status) is float:
         assert math.copysign(1, restored) == math.copysign(1, status)
     assert record == before
@@ -97,8 +97,7 @@ def test_status_preservation_does_not_mutate_event_data():
     normalized = _create_normalized_event_data(data, originals)
 
     assert normalized == {"Status": '{"Code":"0x20"}', "Counter": 2**63 - 1}
-    assert json.loads(originals["Status"]) == data["Status"]
-    assert originals["Counter"] == str(2**64 - 1)
+    assert originals == {"Counter": str(2**64 - 1)}
     assert data == before
 
 
@@ -109,7 +108,7 @@ def test_absent_status_does_not_add_a_sidecar():
     assert "event_data_original" not in document["winlog"]
 
 
-def test_distinct_status_values_and_types_have_distinct_ids():
+def test_equivalent_status_text_shares_ids_regardless_of_source_json_type():
     statuses = ["0", 0, False, None, "null", "false", {}, []]
     documents = [
         format_record(raw_record({"Status": status}), "sample.evtx", None)
@@ -117,26 +116,24 @@ def test_distinct_status_values_and_types_have_distinct_ids():
     ]
     transport = ElasticsearchUtils.__new__(ElasticsearchUtils)
 
-    assert len({transport.calc_hash(document) for document in documents}) == len(
-        statuses
-    )
-    # Search text groups equivalent spellings; originals keep their JSON types.
-    assert documents[0]["winlog"]["event_data"] == documents[1]["winlog"]["event_data"]
-    assert documents[2]["winlog"]["event_data"] == documents[5]["winlog"]["event_data"]
-    assert documents[3]["winlog"]["event_data"] == documents[4]["winlog"]["event_data"]
+    assert len({transport.calc_hash(document) for document in documents}) == 5
+    for left, right in ((0, 1), (2, 5), (3, 4)):
+        assert documents[left] == documents[right]
+        assert transport.calc_hash(documents[left]) == transport.calc_hash(
+            documents[right]
+        )
 
 
-def test_status_changes_ids_from_the_legacy_null_without_changing_originals():
+def test_status_changes_ids_from_the_legacy_null_and_previous_duplicate():
     document = format_record(raw_record({"Status": "0x20"}), "sample.evtx", None)
     previous = deepcopy(document)
     previous["winlog"]["event_data"]["Status"] = None
     transport = ElasticsearchUtils.__new__(ElasticsearchUtils)
 
     assert transport.calc_hash(document) != transport.calc_hash(previous)
-    assert (
-        document["winlog"]["event_data_original"]
-        == previous["winlog"]["event_data_original"]
-    )
+    previous = deepcopy(document)
+    previous["winlog"]["event_data_original"] = {"Status": '"0x20"'}
+    assert transport.calc_hash(document) != transport.calc_hash(previous)
 
 
 @pytest.mark.parametrize(
@@ -151,7 +148,9 @@ def test_long_status_is_not_truncated_in_json_outputs(status):
         restored = orjson.loads(payload)
         result = restored[0] if isinstance(restored, list) else restored
         assert result == document
-        assert json.loads(result["winlog"]["event_data_original"]["Status"]) == status
+        text = result["winlog"]["event_data"]["Status"]
+        assert (text if isinstance(status, str) else json.loads(text)) == status
+        assert "event_data_original" not in result["winlog"]
 
 
 def test_status_object_key_order_keeps_the_same_id_and_array_order():
@@ -168,7 +167,7 @@ def test_status_object_key_order_keeps_the_same_id_and_array_order():
     assert documents[0] == documents[1]
     assert transport.calc_hash(documents[0]) == transport.calc_hash(documents[1])
     for status, document in zip(statuses, documents):
-        restored = json.loads(document["winlog"]["event_data_original"]["Status"])
+        restored = json.loads(document["winlog"]["event_data"]["Status"])
         assert restored == status
         assert type(restored["Details"][0]["Code"]) is int
         assert type(restored["Details"][0]["Retry"]) is bool
@@ -177,4 +176,4 @@ def test_status_object_key_order_keeps_the_same_id_and_array_order():
     reordered["Details"].reverse()
     document = format_record(raw_record({"Status": reordered}), "sample.evtx", None)
     assert transport.calc_hash(document) != transport.calc_hash(documents[0])
-    assert json.loads(document["winlog"]["event_data_original"]["Status"]) == reordered
+    assert json.loads(document["winlog"]["event_data"]["Status"]) == reordered

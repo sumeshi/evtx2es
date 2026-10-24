@@ -17,7 +17,6 @@ PROPERTIES = {
     "winlog": {
         "properties": {
             "event_data": {"properties": {"Status": KEYWORD}},
-            "event_data_original": {"properties": {"Status": KEYWORD}},
         }
     }
 }
@@ -52,7 +51,7 @@ def api_error(error_type, status, kind):
 @pytest.fixture
 def client(monkeypatch):
     connection = MagicMock()
-    connection.indices.get.return_value = {"target": index_info(KEYWORD, KEYWORD)}
+    connection.indices.get.return_value = {"target": index_info(KEYWORD)}
     monkeypatch.setattr(module, "Elasticsearch", lambda **kwargs: connection)
     client = module.ElasticsearchUtils("localhost", 9200, "http", "", "")
     client.sent = []
@@ -70,7 +69,6 @@ def record(status="0xc000013a"):
     return {
         "winlog": {
             "event_data": {"Status": status},
-            "event_data_original": {"Status": f'"{status}"'},
         }
     }
 
@@ -95,10 +93,10 @@ def test_keyword_mapping_keeps_sources_ids_and_pipeline_and_caches_direct_index(
     client.es.indices.get.assert_called_once()
 
 
-def test_new_index_gets_explicit_search_and_original_keyword_mappings(client):
+def test_new_index_gets_only_explicit_search_keyword_mapping(client):
     client.es.indices.get.side_effect = [
         api_error(NotFoundError, 404, "index_not_found_exception"),
-        {"target": index_info(KEYWORD, KEYWORD)},
+        {"target": index_info(KEYWORD)},
     ]
 
     assert client.bulk_indice([record()], "target") == (1, [])
@@ -111,14 +109,12 @@ def test_new_index_gets_explicit_search_and_original_keyword_mappings(client):
     assert client.es.indices.get.call_count == 2
 
 
-@pytest.mark.parametrize(
-    "path", ["document", "winlog", "event_data", "event_data_original"]
-)
+@pytest.mark.parametrize("path", ["document", "winlog", "event_data"])
 @pytest.mark.parametrize("override", [{"enabled": False}, {"type": "nested"}])
 def test_new_index_template_disabled_or_nested_parent_is_rejected(
     client, path, override
 ):
-    info = index_info(KEYWORD, KEYWORD)
+    info = index_info(KEYWORD)
     if path == "document":
         parent = info["mappings"]
     elif path == "winlog":
@@ -156,7 +152,7 @@ def test_new_index_metadata_permission_failure_does_not_cache_or_send_status(cli
     assert "target" not in client._adapter._status_indices
 
 
-def test_old_null_did_not_establish_a_mapping_and_both_fields_can_be_added(client):
+def test_old_null_did_not_establish_a_mapping_and_search_field_can_be_added(client):
     info = index_info()
     info["mappings"]["properties"]["winlog"]["properties"]["record_id"] = {
         "type": "long"
@@ -171,37 +167,21 @@ def test_old_null_did_not_establish_a_mapping_and_both_fields_can_be_added(clien
     assert info == before
 
 
-@pytest.mark.parametrize("field", ["event_data", "event_data_original"])
-def test_only_missing_status_mapping_is_added(client, field):
-    info = index_info(KEYWORD, KEYWORD)
-    del info["mappings"]["properties"]["winlog"]["properties"][field]
-    client.es.indices.get.return_value = {"target": info}
-
-    client.bulk_indice([record()], "target")
-    client.es.indices.put_mapping.assert_called_once_with(
-        index="target",
-        properties={
-            "winlog": {"properties": {field: {"properties": {"Status": KEYWORD}}}}
-        },
-    )
-
-
-@pytest.mark.parametrize("field", ["event_data", "event_data_original"])
 @pytest.mark.parametrize(
     "existing_type", ["long", "date", "boolean", "object", "alias"]
 )
 def test_incompatible_mapping_is_rejected_before_any_source_or_mapping_write(
-    client, field, existing_type
+    client, existing_type
 ):
     info = index_info()
-    info["mappings"]["properties"]["winlog"]["properties"][field] = {
+    info["mappings"]["properties"]["winlog"]["properties"]["event_data"] = {
         "properties": {"Status": {"type": existing_type}}
     }
     client.es.indices.get.return_value = {"target": info}
     before = deepcopy(info)
 
     with pytest.raises(
-        Exception, match=rf"incompatible winlog\.{field}\.Status.*Use a new index"
+        Exception, match=r"incompatible winlog\.event_data\.Status.*Use a new index"
     ):
         client.bulk_indice([record()], "target")
     assert client.sent == [] and info == before
@@ -209,9 +189,7 @@ def test_incompatible_mapping_is_rejected_before_any_source_or_mapping_write(
     client.es.indices.create.assert_not_called()
 
 
-@pytest.mark.parametrize(
-    "path", ["document", "winlog", "event_data", "event_data_original"]
-)
+@pytest.mark.parametrize("path", ["document", "winlog", "event_data"])
 @pytest.mark.parametrize(
     "mapping", [{"enabled": False}, {"type": "keyword"}, {"type": "nested"}]
 )
@@ -297,7 +275,7 @@ def test_incompatible_keyword_multifield_is_not_replaced(client):
 def test_create_race_rechecks_existing_mapping_instead_of_overwriting(client):
     client.es.indices.get.side_effect = [
         api_error(NotFoundError, 404, "index_not_found_exception"),
-        {"target": index_info(KEYWORD, KEYWORD)},
+        {"target": index_info(KEYWORD)},
     ]
     client.es.indices.create.side_effect = api_error(
         BadRequestError, 400, "resource_already_exists_exception"
@@ -410,10 +388,12 @@ def test_empty_input_does_not_require_mapping_permissions(client):
     client.es.indices.get.assert_not_called()
 
 
-def test_status_only_in_original_sidecar_also_prepares_the_mapping(client):
+def test_legacy_status_only_in_original_does_not_prepare_a_mapping(client):
     document = {"winlog": {"event_data_original": {"Status": '"0"'}}}
     assert client.bulk_indice([document], "target") == (1, [])
-    client.es.indices.get.assert_called_once()
+    client.es.indices.get.assert_not_called()
+    client.es.indices.put_mapping.assert_not_called()
+    client.es.indices.create.assert_not_called()
 
 
 def test_permission_failure_is_reported_before_any_status_is_sent(client):
@@ -424,3 +404,72 @@ def test_permission_failure_is_reported_before_any_status_is_sent(client):
     assert client.sent == []
     client.es.indices.put_mapping.assert_not_called()
     client.es.indices.create.assert_not_called()
+
+
+@pytest.mark.parametrize("existing_type", ["long", "date", "boolean", "object", "text"])
+@pytest.mark.parametrize("search_mapping_present", [False, True])
+def test_legacy_original_status_mapping_is_not_validated_or_modified(
+    client, existing_type, search_mapping_present
+):
+    info = index_info(
+        KEYWORD if search_mapping_present else MISSING,
+        {"type": existing_type},
+    )
+    before = deepcopy(info)
+    client.es.indices.get.return_value = {"target": info}
+
+    assert client.bulk_indice([record()], "target") == (1, [])
+
+    assert info == before
+    if search_mapping_present:
+        client.es.indices.put_mapping.assert_not_called()
+    else:
+        client.es.indices.put_mapping.assert_called_once_with(
+            index="target", properties=PROPERTIES
+        )
+    assert client.sent[0]["_source"] == record()
+
+
+@pytest.mark.parametrize(
+    "original_parent", [{"enabled": False}, {"type": "nested"}, {"type": "keyword"}]
+)
+@pytest.mark.parametrize("new_index", [False, True])
+def test_legacy_original_parent_is_not_validated_or_modified(
+    client, original_parent, new_index
+):
+    info = index_info(KEYWORD)
+    info["mappings"]["properties"]["winlog"]["properties"][
+        "event_data_original"
+    ] = original_parent
+    before = deepcopy(info)
+    if new_index:
+        client.es.indices.get.side_effect = [
+            api_error(NotFoundError, 404, "index_not_found_exception"),
+            {"target": info},
+        ]
+    else:
+        client.es.indices.get.return_value = {"target": info}
+
+    assert client.bulk_indice([record()], "target") == (1, [])
+
+    assert info == before
+    client.es.indices.put_mapping.assert_not_called()
+    if new_index:
+        client.es.indices.create.assert_called_once_with(
+            index="target", mappings={"properties": PROPERTIES}
+        )
+    else:
+        client.es.indices.create.assert_not_called()
+
+
+def test_unrelated_original_values_are_sent_unchanged(client):
+    document = record()
+    document["winlog"]["event_data_original"] = {"Counter": str(2**64 - 1)}
+    before = deepcopy(document)
+
+    assert client.bulk_indice([document], "target") == (1, [])
+
+    assert document == before
+    assert client.sent[0]["_source"] == before
+    assert client.sent[0]["_id"] == client.calc_hash(before)
+    client.es.indices.put_mapping.assert_not_called()

@@ -5,7 +5,6 @@ from copy import deepcopy
 from elasticsearch import BadRequestError, NotFoundError
 
 STATUS_MAPPING = {"type": "keyword", "ignore_above": 8191}
-STATUS_CONTAINERS = ("event_data", "event_data_original")
 
 
 class ElasticsearchAdapter:
@@ -17,9 +16,7 @@ class ElasticsearchAdapter:
         mapping_checked = False
         for record in records:
             winlog = record.get("winlog", {})
-            if not mapping_checked and any(
-                "Status" in winlog.get(container, {}) for container in STATUS_CONTAINERS
-            ):
+            if not mapping_checked and "Status" in winlog.get("event_data", {}):
                 self._ensure_status_mapping(index_name)
                 mapping_checked = True
             yield record
@@ -33,8 +30,7 @@ class ElasticsearchAdapter:
         properties = {
             "winlog": {
                 "properties": {
-                    container: {"properties": {"Status": dict(STATUS_MAPPING)}}
-                    for container in STATUS_CONTAINERS
+                    "event_data": {"properties": {"Status": dict(STATUS_MAPPING)}}
                 }
             }
         }
@@ -93,30 +89,33 @@ class ElasticsearchAdapter:
         self._validate_container(concrete_index, "document", mapping)
         winlog = mapping.get("properties", {}).get("winlog", {})
         self._validate_container(concrete_index, "winlog", winlog)
-        additions = {}
-        for container in STATUS_CONTAINERS:
-            path = f"winlog.{container}"
-            parent = winlog.get("properties", {}).get(container, {})
-            self._validate_container(concrete_index, path, parent)
-            status = parent.get("properties", {}).get("Status")
-            if status is None:
-                additions[container] = {"properties": {"Status": dict(STATUS_MAPPING)}}
-            elif status.get("type") == "text":
-                keyword = status.get("fields", {}).get("keyword")
-                if keyword is None:
-                    extended = deepcopy(status)
-                    extended.setdefault("fields", {})["keyword"] = dict(STATUS_MAPPING)
-                    additions[container] = {"properties": {"Status": extended}}
-                elif keyword.get("type") != "keyword":
-                    self._incompatible(concrete_index, f"{path}.Status.keyword")
-            elif status.get("type") != "keyword":
-                self._incompatible(concrete_index, f"{path}.Status")
-        # Validate both fields before writing: an incompatible old mapping is
-        # never partially updated, and unrelated properties remain untouched.
-        if additions:
+        parent = winlog.get("properties", {}).get("event_data", {})
+        self._validate_container(concrete_index, "winlog.event_data", parent)
+        status = parent.get("properties", {}).get("Status")
+        addition = None
+        if status is None:
+            addition = dict(STATUS_MAPPING)
+        elif status.get("type") == "text":
+            keyword = status.get("fields", {}).get("keyword")
+            if keyword is None:
+                addition = deepcopy(status)
+                addition.setdefault("fields", {})["keyword"] = dict(STATUS_MAPPING)
+            elif keyword.get("type") != "keyword":
+                self._incompatible(concrete_index, "winlog.event_data.Status.keyword")
+        elif status.get("type") != "keyword":
+            self._incompatible(concrete_index, "winlog.event_data.Status")
+        # Only the search field is managed here; unrelated original-value
+        # mappings, including ones left by earlier versions, remain untouched.
+        if addition is not None:
             self.es.indices.put_mapping(
                 index=concrete_index,
-                properties={"winlog": {"properties": additions}},
+                properties={
+                    "winlog": {
+                        "properties": {
+                            "event_data": {"properties": {"Status": addition}}
+                        }
+                    }
+                },
             )
         # An alias can switch its write index between batches, so only direct
         # concrete-index requests may bypass the next metadata lookup.
