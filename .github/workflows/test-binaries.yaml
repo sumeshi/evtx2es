@@ -1,0 +1,123 @@
+name: test-binaries
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PACKAGE: evtx2es
+  PYTHON_VERSION: '3.13'
+  NUITKA_EXTRA_ARGS: ''
+  PYTHON_CPU_COUNT: '2'
+  PYTHONUTF8: '1'
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Python
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf build-essential
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Prepare native validation
+        run: uv run --locked python .github/binary_smoke.py prepare
+
+      - name: Collect runtime licenses
+        run: uv run --locked python .github/collect_runtime_licenses.py dist/LICENSES.txt
+
+      - name: Build binaries
+        run: uv run --locked python .github/build_binaries.py
+
+      - name: Upload isolated validation bundle
+        uses: actions/upload-artifact@v6
+        with:
+          name: native-binaries-${{ runner.os }}
+          path: dist/validation/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: binary-build-diagnostics-${{ runner.os }}
+          path: dist/validation/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  verify:
+    name: Verify without project on ${{ matrix.os }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Set up Python
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download isolated validation bundle
+        uses: actions/download-artifact@v7
+        with:
+          name: native-binaries-${{ runner.os }}
+          path: validation
+
+      - name: Confirm project is not installed
+        run: uv run --no-project --python "$PYTHON_VERSION" python -I -c "import importlib.util, os; assert importlib.util.find_spec(os.environ['PACKAGE']) is None"
+
+      - name: Restore executable permissions
+        if: runner.os == 'Linux'
+        run: chmod +x validation/binaries/*
+
+      - name: Verify isolated binaries
+        run: uv run --no-project --python "$PYTHON_VERSION" python -I validation/verify.py verify --work-dir validation --binary-dir validation/binaries
+
+      - name: Upload verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: binary-verification-${{ runner.os }}
+          path: |
+            validation/summary.json
+            validation/logs/
+            validation/outputs/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,0 +1,91 @@
+name: test-elasticsearch
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ELASTICSEARCH_IMAGE: elasticsearch:9.5.5
+  ELASTICSEARCH_URL: http://127.0.0.1:9200
+  ELASTICSEARCH_CONTAINER: forensic-tools-elasticsearch
+  PYTHON_CPU_COUNT: '2'
+
+jobs:
+  integration:
+    name: Native artifacts to Elasticsearch
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Python
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: '3.13'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+          sudo sysctl -w vm.max_map_count=1048576
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Start Elasticsearch
+        run: |
+          mkdir -p reports
+          docker run --detach --name "$ELASTICSEARCH_CONTAINER" \
+            --publish 127.0.0.1:9200:9200 --memory 2g --cpus 2 \
+            --env discovery.type=single-node \
+            --env xpack.security.enabled=false \
+            --env 'ES_JAVA_OPTS=-Xms512m -Xmx512m' \
+            "$ELASTICSEARCH_IMAGE"
+          curl --fail --silent --show-error --retry 60 --retry-delay 2 \
+            --retry-connrefused --retry-all-errors --retry-max-time 180 --connect-timeout 5 --max-time 70 \
+            "$ELASTICSEARCH_URL/_cluster/health?wait_for_status=yellow&timeout=60s" \
+            --output reports/elasticsearch-health.json
+          uv run --locked python -c "import json; health=json.load(open('reports/elasticsearch-health.json')); assert not health['timed_out'] and health['status'] in ('yellow', 'green'), health"
+
+      - name: Verify native ingestion and mappings
+        run: uv run --locked pytest -q tests/test_real_elasticsearch.py --junitxml=reports/elasticsearch-pytest.xml
+
+      - name: Report integration failures
+        if: failure()
+        continue-on-error: true
+        run: uv run --locked python .github/report_pytest.py reports/elasticsearch-pytest.xml
+
+      - name: Collect Elasticsearch diagnostics
+        if: always()
+        run: |
+          mkdir -p reports
+          docker logs "$ELASTICSEARCH_CONTAINER" > reports/elasticsearch.log 2>&1 || true
+          docker inspect "$ELASTICSEARCH_CONTAINER" > reports/elasticsearch-container.json 2>&1 || true
+
+      - name: Upload integration results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: elasticsearch-integration
+          path: reports/
+          if-no-files-found: error
+
+      - name: Stop Elasticsearch
+        if: always()
+        run: docker rm --force "$ELASTICSEARCH_CONTAINER" || true

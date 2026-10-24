@@ -9,10 +9,19 @@ from evtx2es.views.Evtx2esView import entry_point as e2e
 from evtx2es.views.Evtx2jsonView import entry_point as e2j
 
 # utils
-def get_json_length(path: Path) -> int:
-    if path.is_dir():
-        return 0
-    return len(orjson.loads(path.read_bytes()))
+def get_json_records(path: Path) -> list:
+    data = path.read_bytes()
+    if path.suffix == ".jsonl":
+        return [orjson.loads(line) for line in data.splitlines()]
+    return orjson.loads(data)
+
+
+def assert_native_status_is_preserved(records):
+    by_id = {record["winlog"]["record_id"]: record for record in records}
+    for record_id, status in ((246692, "0x20"), (227432, "0xc000013a")):
+        winlog = by_id[record_id]["winlog"]
+        assert winlog["event_data"]["Status"] == status
+        assert "Status" not in winlog.get("event_data_original", {})
 
 
 # command-line test cases
@@ -51,22 +60,34 @@ def test__evtx2json_version(monkeypatch):
 
 # behavior test cases 
 @pytest.mark.usefixtures("prepare_eventlog")
-def test__evtx2json_convert(monkeypatch):
-    path = 'tests/cache/Security.json'
-    argv = ["evtx2json", "-o", path, "tests/cache/Security.evtx"]
+@pytest.mark.parametrize("output_format", ["json", "jsonl"])
+def test__evtx2json_convert(monkeypatch, output_format):
+    path = f"tests/cache/Security.{output_format}"
+    argv = [
+        "evtx2json", "--format", output_format, "-o", path,
+        "tests/cache/Security.evtx",
+    ]
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         e2j()
-    assert get_json_length(Path(path)) == 62031
+    records = get_json_records(Path(path))
+    assert len(records) == 62031
+    assert_native_status_is_preserved(records)
 
 @pytest.mark.usefixtures("prepare_eventlog")
-def test__evtx2json_convert_multiprocessing(monkeypatch):
-    path = 'tests/cache/Security-m.json'
-    argv = ["evtx2json", "-o", path, "-m", "tests/cache/Security.evtx"]
+@pytest.mark.parametrize("output_format", ["json", "jsonl"])
+def test__evtx2json_convert_multiprocessing(monkeypatch, output_format):
+    path = f"tests/cache/Security-m.{output_format}"
+    argv = [
+        "evtx2json", "--format", output_format, "-o", path, "-m",
+        "tests/cache/Security.evtx",
+    ]
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         e2j()
-    assert get_json_length(Path(path)) == 62031
+    records = get_json_records(Path(path))
+    assert len(records) == 62031
+    assert_native_status_is_preserved(records)
 
 
 @pytest.mark.usefixtures("prepare_eventlog")
@@ -84,6 +105,8 @@ def test__evtx2json_multiprocessing_keeps_record_order():
     ]
 
     assert multiprocessing_record_ids == record_ids
+    assert_native_status_is_preserved(records)
+    assert_native_status_is_preserved(multiprocessing_records)
 
 
 def test__gen_records_yields_each_chunk_without_extra_buffering(monkeypatch):
@@ -93,7 +116,7 @@ def test__gen_records_yields_each_chunk_without_extra_buffering(monkeypatch):
         def records_json(self):
             return iter(range(5))
 
-    def fake_process_by_chunk(records, filepath, shift, additional_tags=None):
+    def fake_process_by_chunk(records, filepath, shift, additional_tags=None, on_record_error=None):
         return list(records)
 
     monkeypatch.setattr(evtx2es_model, "process_by_chunk", fake_process_by_chunk)

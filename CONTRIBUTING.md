@@ -22,7 +22,7 @@ $ cd evtx2es
 
 ```bash
 $ pip install uv
-$ uv sync --dev
+$ uv sync --locked
 ```
 
 **Editor**: This project is developed using Cursor with custom rules (currently being organized).
@@ -30,7 +30,7 @@ $ uv sync --dev
 ### Running Tests
 
 ```bash
-$ uv run pytest
+$ uv run --locked pytest
 ```
 
 ### Code Style
@@ -55,7 +55,7 @@ This project uses:
 - Update documentation if needed
 
 ## Requirements
-- Python 3.11+
+- Python 3.13+
 - Dependencies listed in `pyproject.toml`
 
 ## License

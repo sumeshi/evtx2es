@@ -2,15 +2,15 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Generator, Iterable, Union, Any, Optional, Sequence, Callable
-import multiprocessing as mp
-import sys
-import os
-from collections import deque
 import logging
 import re
 
 import orjson
 from evtx import PyEvtxParser
+
+from .MultiprocessingUtils import SafeMultiprocessingMixin
+from .MultiprocessingUtils import mp as mp
+from .MultiprocessingUtils import ordered_pool_results
 
 
 MAX_CONSECUTIVE_PARSE_ERRORS = 100
@@ -57,32 +57,6 @@ def normalize_tags(
         if tag not in result:
             result.append(tag)
     return result
-
-
-class SafeMultiprocessingMixin:
-    """Safe multiprocessing management class for Python 3.13 compatibility"""
-
-    @staticmethod
-    def get_multiprocessing_context() -> mp.context:
-        """Get safe multiprocessing context"""
-        # Use spawn for Python 3.13+ or test environments to avoid fork() issues
-        if sys.version_info >= (3, 13) or "pytest" in sys.modules:
-            try:
-                ctx = mp.get_context("spawn")
-            except RuntimeError:
-                ctx = mp.get_context()
-        else:
-            ctx = mp.get_context()
-
-        return ctx
-
-    @staticmethod
-    def get_cpu_count() -> int:
-        """Get CPU count safely"""
-        try:
-            return mp.cpu_count()
-        except NotImplementedError:
-            return os.cpu_count() or 1
 
 
 def generate_chunks(
@@ -159,14 +133,6 @@ def _parse_event_data(record: dict) -> dict:
     if isinstance(system.get("EventID"), dict):
         system["EventID"] = system["EventID"].get("#text")
 
-    # Keep the existing Status behavior until mixed value shapes are checked
-    # against the Elasticsearch mapping.
-    try:
-        if "EventData" in event and event["EventData"] is not None and "Status" in event["EventData"]:
-            event["EventData"]["Status"] = None
-    except Exception:
-        pass
-
     return {
         "system": system,
         "event_data": event.get("EventData", {}),
@@ -198,6 +164,15 @@ def _create_timestamp_field(system_time: str, shift: Optional[timedelta]) -> str
 
 def _normalize_field_value(key: str, value) -> Any:
     """Normalize specific field values for ProcessId and numeric ranges."""
+    if key == "Status":
+        # Keep codes directly searchable, including their spelling and case.
+        # Other JSON types use JSON notation rather than Python's str/repr.
+        return (
+            value
+            if isinstance(value, str)
+            else orjson.dumps(value, option=orjson.OPT_SORT_KEYS).decode("utf-8")
+        )
+
     if key == "Reason":
         return str(value)
 
@@ -221,14 +196,24 @@ def _normalize_field_value(key: str, value) -> Any:
     return value
 
 
-def _create_normalized_event_data(event_data: dict) -> dict:
-    """Create normalized event_data fields."""
+def _create_normalized_event_data(
+    event_data: dict, original_values: Optional[dict] = None
+) -> dict:
+    """Normalize search values and retain clamped integers as decimal text."""
     if not event_data or len(event_data) == 0:
         return {}
 
     normalized_data = {}
     for k, v in event_data.items():
-        normalized_data[k] = _normalize_field_value(k, v)
+        normalized = _normalize_field_value(k, v)
+        normalized_data[k] = normalized
+        if (
+            original_values is not None
+            and type(v) is int
+            and type(normalized) is int
+            and normalized != v
+        ):
+            original_values[k] = str(v)
 
     return normalized_data
 
@@ -271,7 +256,9 @@ def format_record(
                 "task": int,
                 "version": int,
                 "provider": {"name": str, "guid": str},
-                "event_data": dict (optional)
+                "event_data": dict (optional),
+                "event_data_original": dict (optional, clamped integers as
+                    decimal text)
             },
             "userdata": dict (optional),
             "process": {"pid": int, "thread": {"id": int}} (optional),
@@ -280,6 +267,8 @@ def format_record(
             },
             "tags": [str]
         }
+
+    Optional System fields that are absent in the source remain null.
     """
     tags = normalize_tags(additional_tags)
 
@@ -287,45 +276,78 @@ def format_record(
     parsed_data = _parse_event_data(record)
 
     system = parsed_data["system"]
-    channel = system["Channel"]
+    channel = system.get("Channel")
     event_id = system["EventID"]
-    provider_attrs = system["Provider"]["#attributes"]
-    timestamp = _create_timestamp_field(
-        system["TimeCreated"]["#attributes"]["SystemTime"], shift
+    provider_attrs = (system["Provider"] or {}).get("#attributes") or {}
+    provider_name = provider_attrs.get("Name")
+    created = ((system.get("TimeCreated") or {}).get("#attributes") or {}).get(
+        "SystemTime"
     )
+    timestamp = _create_timestamp_field(created, shift) if created is not None else None
 
     # Create ECS-compliant event fields
     event_fields = {
-        "action": f"eventlog-{channel.lower()}-{event_id}",
+        "action": (
+            f"eventlog-{channel.lower()}-{event_id}"
+            if channel is not None
+            else f"eventlog-{event_id}"
+        ),
         "category": ["host"],
         "type": ["info"],
         "kind": "event",
-        "provider": provider_attrs["Name"].lower(),
+        "provider": provider_name.lower() if provider_name is not None else None,
         "module": "windows",
         "dataset": "windows.eventlog",
         "code": event_id,
-        "created": system["TimeCreated"]["#attributes"]["SystemTime"],
+        "created": created,
     }
 
     # Create Windows-specific fields
     windows_eventlog = {
         "channel": channel,
-        "computer_name": system["Computer"],
+        "computer_name": system.get("Computer"),
         "event_id": event_id,
         "opcode": system.get("Opcode"),
-        "record_id": system["EventRecordID"],
-        "task": system["Task"],
+        "record_id": system.get("EventRecordID"),
+        "task": system.get("Task"),
         "version": system.get("Version"),
         "provider": {
-            "name": provider_attrs["Name"],
+            "name": provider_name,
             "guid": provider_attrs.get("Guid"),
         },
     }
 
+    # Keep source values used to assess or correlate events, including zeroes.
+    for source, target in (("Level", "level"), ("Keywords", "keywords")):
+        if source in system:
+            windows_eventlog[target] = system[source]
+
+    security = system.get("Security")
+    security_attrs = security.get("#attributes") if isinstance(security, dict) else None
+    if isinstance(security_attrs, dict) and "UserID" in security_attrs:
+        windows_eventlog["user"] = {"identifier": security_attrs["UserID"]}
+
+    correlation = system.get("Correlation")
+    correlation_attrs = (
+        correlation.get("#attributes") if isinstance(correlation, dict) else None
+    )
+    if isinstance(correlation_attrs, dict):
+        for source, target in (
+            ("ActivityID", "activity_id"),
+            ("RelatedActivityID", "related_activity_id"),
+        ):
+            if source in correlation_attrs:
+                windows_eventlog[target] = correlation_attrs[source]
+
     # Add event_data if present
-    normalized_event_data = _create_normalized_event_data(parsed_data["event_data"])
+    original_event_data = {}
+    normalized_event_data = _create_normalized_event_data(
+        parsed_data["event_data"], original_event_data
+    )
     if normalized_event_data:
         windows_eventlog["event_data"] = normalized_event_data
+    if original_event_data:
+        windows_eventlog["event_data_original"] = original_event_data
 
     # Build the final ECS-compliant result object
     result = {
@@ -363,6 +385,7 @@ def process_by_chunk(
     filepath: str,
     shift: Optional[timedelta],
     additional_tags: Union[str, Sequence[str], None] = None,
+    on_record_error: Optional[Callable[[dict], None]] = None,
 ) -> List[dict]:
     """Perform formatting for each chunk. (for efficiency)
 
@@ -371,26 +394,48 @@ def process_by_chunk(
         filepath (str): Source event log path.
         shift (timedelta or None): Timestamp shift.
         additional_tags (List[str], optional): Additional tags to add to each record.
+        on_record_error: Receives a diagnostic for each record that cannot be
+            formatted. Without a callback, failures are logged as warnings.
 
-    Yields:
-        List[dict]: A list of formatted Event Log records.
+    Returns:
+        List[dict]: Successfully formatted records, preserving their input order.
     """
 
     additional_tags = normalize_tags(additional_tags)
 
-    record_list = records
-
-    return [
-        format_record(
-            record, filepath=filepath, shift=shift, additional_tags=additional_tags
-        )
-        for record in record_list
-    ]
+    formatted = []
+    for record in records:
+        try:
+            formatted.append(
+                format_record(
+                    record, filepath=filepath, shift=shift,
+                    additional_tags=additional_tags,
+                )
+            )
+        except Exception as error:
+            diagnostic = {
+                "source_file": str(Path(filepath).resolve()),
+                "error": f"{type(error).__name__}: {error}",
+                "stage": "normalization",
+            }
+            if isinstance(record, dict):
+                record_id = record.get("event_record_id")
+                if isinstance(record_id, (int, str)):
+                    diagnostic["record_id"] = record_id
+            if on_record_error is not None:
+                on_record_error(diagnostic)
+            else:
+                logger.warning("Skipped EVTX normalization error: %s", diagnostic)
+    return formatted
 
 
 def _mp_worker(args):
     records, filepath, shift, additional_tags = args
-    return process_by_chunk(records, filepath, shift, additional_tags)
+    diagnostics = []
+    formatted = process_by_chunk(
+        records, filepath, shift, additional_tags, diagnostics.append
+    )
+    return formatted, diagnostics
 
 
 class Evtx2es(SafeMultiprocessingMixin):
@@ -444,25 +489,27 @@ class Evtx2es(SafeMultiprocessingMixin):
             ctx = self.get_multiprocessing_context()
             worker_count = max(1, self.get_cpu_count())
             with ctx.Pool(worker_count) as pool:
-                pending = deque()
-                max_pending = worker_count * 2
-                # Consume the PyO3-backed iterator here, on the caller thread. Only
-                # materialized Python chunks cross into multiprocessing workers.
-                for chunk in generate_chunks(
-                    chunk_size, self.parser.records_json(), self._record_parse_error
-                ):
-                    pending.append(
-                        pool.apply_async(
-                            _mp_worker,
-                            ((chunk, str(self.path), shift, additional_tags),),
-                        )
+                # Advance the native iterator on this thread; only materialized
+                # Python chunks are handed to the shared submission helper.
+                tasks = (
+                    (chunk, str(self.path), shift, additional_tags)
+                    for chunk in generate_chunks(
+                        chunk_size, self.parser.records_json(), self._record_parse_error
                     )
-                    if len(pending) >= max_pending:
-                        yield pending.popleft().get()
-                while pending:
-                    yield pending.popleft().get()
+                )
+                for formatted, diagnostics in ordered_pool_results(
+                    pool, _mp_worker, tasks, worker_count * 2
+                ):
+                    self.diagnostics.extend(diagnostics)
+                    if formatted:
+                        yield formatted
         else:
             for records in generate_chunks(
                 chunk_size, self.parser.records_json(), self._record_parse_error
             ):
-                yield process_by_chunk(records, str(self.path), shift, additional_tags)
+                formatted = process_by_chunk(
+                    records, str(self.path), shift, additional_tags,
+                    self.diagnostics.append,
+                )
+                if formatted:
+                    yield formatted

@@ -2,31 +2,23 @@
 
 Run in the same environment as Nuitka. Missing material stops the release;
 license identifiers and links are not substitutes for license text.
+Artifact-specific dependencies and notices are in license_manifest.json.
 """
 
 from __future__ import annotations
 
 import argparse
 from importlib.metadata import PackageNotFoundError, distribution
+import json
 from pathlib import Path
 import sys
 import sysconfig
 
-STANDALONE_DISTRIBUTIONS = (
-    "sniffio",
-    "idna",
-    "anyio",
-    "typing-extensions",
-    "six",
-    "python-dateutil",
-    "certifi",
-    "elastic-transport",
-    "elasticsearch",
-    "evtx",
-    "orjson",
-    "tqdm",
-    "urllib3",
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MANIFEST = json.loads(
+    Path(__file__).with_name("license_manifest.json").read_text(encoding="utf-8")
 )
+STANDALONE_DISTRIBUTIONS = tuple(MANIFEST["standalone_distributions"])
 
 
 def _is_license_file(path: str) -> bool:
@@ -47,9 +39,7 @@ def _runtime_distributions():
         try:
             packages.append(distribution(name))
         except PackageNotFoundError as exc:
-            raise RuntimeError(
-                f"runtime dependency is not installed: {name}"
-            ) from exc
+            raise RuntimeError(f"runtime dependency is not installed: {name}") from exc
     return packages
 
 
@@ -78,22 +68,33 @@ def _python_license() -> str:
                 text = path.read_text(encoding="utf-8")
                 if text.strip():
                     return text
-    raise RuntimeError(
-        "Python runtime license not found in the build interpreter"
+    raise RuntimeError("Python runtime license not found in the build interpreter")
+
+
+def _manifest_text(entry: dict) -> str:
+    text = (
+        entry["text"]
+        if "text" in entry
+        else (PROJECT_ROOT / entry["path"]).read_text(encoding="utf-8")
     )
+    if not text.strip():
+        raise RuntimeError(
+            f"empty license material: {entry.get('path', entry.get('distribution', 'notice'))}"
+        )
+    return text
 
 
 def collect(output_file: Path) -> None:
-    project_root = Path(__file__).resolve().parents[1]
-    sections = ["License and Third-Party Notices"]
+    sections = ["License and Third-Party Notices", *MANIFEST["notices"]]
 
     def append_text(title: str, text: str) -> None:
         sections.append(f"{title}\n{'=' * len(title)}\n\n{text.rstrip()}")
 
     append_text(
-        f"{project_root.name} — MIT",
-        (project_root / "LICENSE").read_text(encoding="utf-8"),
+        f"{MANIFEST['project_name']} — MIT", _manifest_text({"path": "LICENSE"})
     )
+    for entry in MANIFEST["license_files"]:
+        append_text(entry["title"], _manifest_text(entry))
     append_text(f"Python {sys.version.split()[0]}", _python_license())
 
     for package in _runtime_distributions():
@@ -102,17 +103,17 @@ def collect(output_file: Path) -> None:
         materials = []
         for path in sorted(package.files or [], key=str):
             if _is_license_file(str(path)):
-                text = Path(package.locate_file(path)).read_text(
-                    encoding="utf-8"
-                )
+                text = Path(package.locate_file(path)).read_text(encoding="utf-8")
                 if text.strip():
                     materials.append(f"--- {path} ---\n{text.rstrip()}")
-        if not materials and (name, package.version) == ("evtx", "0.13.1"):
-            materials.append(
-                (project_root / "LICENSES" / "evtx-0.13.1.txt").read_text(
-                    encoding="utf-8"
-                )
-            )
+        if not materials:
+            for fallback in MANIFEST["fallbacks"]:
+                if (name, package.version) == (
+                    fallback["distribution"],
+                    fallback["version"],
+                ):
+                    materials.append(_manifest_text(fallback))
+                    break
         if not materials:
             raise RuntimeError(
                 f"no license file found for runtime dependency: "

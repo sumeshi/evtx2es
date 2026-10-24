@@ -104,9 +104,6 @@ venv.bak/
 .mypy_cache/
 
 # evtx2es
-*.json
 *.evtx
-
-!.devcontainer/devcontainer.json
 
 TASKS.md
