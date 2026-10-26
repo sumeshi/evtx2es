@@ -102,26 +102,34 @@ class Evtx2jsonPresenter:
                 delete=False,
             ) as output:
                 temporary_path = Path(output.name)
+                parser = Evtx2es(self.input_path)
+                records = parser.gen_records(
+                    self.shift,
+                    self.multiprocess,
+                    self.chunk_size,
+                    self.additional_tags,
+                )
+                progress = records if self.is_quiet else tqdm(records)
                 if self.output_format == "json":
-                    documents = self.evtx2json()
-                    record_count = len(documents)
-                    output.write(
-                        orjson.dumps(documents, option=orjson.OPT_INDENT_2)
-                    )
+                    for batch in progress:
+                        for record in batch:
+                            output.write(b"[\n" if record_count == 0 else b",\n")
+                            # Preserve the full array's indentation while
+                            # serializing only one record at a time.
+                            output.write(
+                                orjson.dumps(
+                                    [record], option=orjson.OPT_INDENT_2
+                                )[2:-2]
+                            )
+                            record_count += 1
+                        output.flush()
+                    output.write(b"\n]" if record_count else b"[]")
                 else:
-                    parser = Evtx2es(self.input_path)
-                    records = parser.gen_records(
-                        self.shift,
-                        self.multiprocess,
-                        self.chunk_size,
-                        self.additional_tags,
-                    )
-                    progress = records if self.is_quiet else tqdm(records)
                     for batch in progress:
                         for record in batch:
                             output.write(orjson.dumps(record) + b"\n")
                             record_count += 1
-                    self.parse_diagnostics = parser.diagnostics
+                self.parse_diagnostics = parser.diagnostics
             if self.parse_diagnostics and record_count == 0:
                 raise PartialExtractionError(self.parse_diagnostics)
             self._check_output_path()
@@ -134,10 +142,12 @@ class Evtx2jsonPresenter:
                 raise PartialExtractionError(self.parse_diagnostics)
         finally:
             try:
-                if progress is not None and progress is not records:
-                    progress.close()
-                if records is not None:
-                    records.close()
+                try:
+                    if progress is not None and progress is not records:
+                        progress.close()
+                finally:
+                    if records is not None:
+                        records.close()
             finally:
                 try:
                     if parser is not None:
