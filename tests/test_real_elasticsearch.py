@@ -133,6 +133,8 @@ def test_native_api_and_cli_round_trip(real_es, tmp_path):
             )
             for interface in ("api", "cli"):
                 index = new_index(f"{interface}-{mode}-{multiprocess}".lower())
+                if "MAPPINGS" in cases:
+                    client.indices.create(index=index, mappings=cases["MAPPINGS"])
                 if interface == "api":
                     es_api(
                         str(source),
