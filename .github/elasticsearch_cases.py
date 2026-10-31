@@ -4,6 +4,7 @@ from collections import Counter
 from copy import deepcopy
 import json
 from hashlib import sha256
+import os
 from pathlib import Path
 import runpy
 from tempfile import TemporaryDirectory
@@ -86,6 +87,9 @@ def run_extra_cases(client, transport, new_index, stored_documents, document_id)
 
     run_status_cases(client, transport, new_index, stored_documents, document_id, raw)
     run_native_status_cases(client, transport, new_index, stored_documents, document_id)
+    run_native_input_path_case(
+        client, transport, new_index, stored_documents, document_id
+    )
 
 
 STATUS_CASES = [
@@ -398,3 +402,33 @@ def run_native_status_cases(
             after_mapping = client.indices.get_mapping(index=index)[index]["mappings"]
             assert status_properties(after_mapping) == status_properties(before_mapping)
         assert sha256(source.read_bytes()).hexdigest() == before
+
+
+def run_native_input_path_case(
+    client, transport, new_index, stored_documents, document_id
+):
+    """Index native EVTX documents from colliding POSIX path displays."""
+    if os.name != "posix":
+        return
+    fixture = runpy.run_path(str(Path(__file__).with_name("status_fixture.py")))
+    with TemporaryDirectory(prefix="evtx-path-es-") as directory:
+        root = Path(directory)
+        raw_source = fixture["create_artifact"](root / os.fsdecode(b"bad-\xff"))
+        literal_source = fixture["create_artifact"](root / r"bad-\udcff")
+        documents = evtx2json(str(raw_source)) + evtx2json(str(literal_source))
+        raw_documents, literal_documents = documents[:15], documents[15:]
+        raw_bytes_hex = os.fsencode(raw_source.resolve()).hex()
+        assert all(
+            document["winlog"]["source"]["file_path_bytes_hex"] == raw_bytes_hex
+            for document in raw_documents
+        )
+        assert all("source" not in document["winlog"] for document in literal_documents)
+        assert (
+            raw_documents[0]["log"]["file"]["path"]
+            == literal_documents[0]["log"]["file"]["path"]
+        )
+        index = new_index("native-byte-path")
+        assert transport.bulk_indice(documents, index) == (30, [])
+        actual = stored_documents(client, index)
+        assert actual == {document_id(document): document for document in documents}
+        assert len(actual) == 30

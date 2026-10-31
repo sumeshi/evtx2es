@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Generator, Iterable, Union, Any, Optional, Sequence, Callable
 import logging
+import os
 import re
 
 import orjson
@@ -15,6 +16,16 @@ from .MultiprocessingUtils import ordered_pool_results
 
 MAX_CONSECUTIVE_PARSE_ERRORS = 100
 logger = logging.getLogger(__name__)
+
+
+def _display_filesystem_path(value: str) -> tuple[str, Optional[str]]:
+    """Render a filesystem path as JSON text, retaining undecodable bytes."""
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        raw = os.fsencode(value).hex()
+        return value.encode("utf-8", "backslashreplace").decode("utf-8"), raw
+    return value, None
 
 
 class PartialExtractionError(RuntimeError):
@@ -374,7 +385,12 @@ def format_record(
     except (KeyError, TypeError, ValueError):
         pass
 
-    result["log"] = {"file": {"path": str(Path(filepath).resolve())}}
+    source_path, source_path_bytes = _display_filesystem_path(
+        str(Path(filepath).resolve())
+    )
+    result["log"] = {"file": {"path": source_path}}
+    if source_path_bytes is not None:
+        result["winlog"]["source"] = {"file_path_bytes_hex": source_path_bytes}
     result["tags"] = tags
 
     return result
