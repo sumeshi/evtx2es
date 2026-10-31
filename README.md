@@ -146,7 +146,7 @@ TLS verification is enabled by default. For a private CA, use
 **evtx2es** also includes `evtx2json`, a command-line tool for converting Windows Event Logs into JSON files. :sushi: :sushi: :sushi:
 
 ```bash
-$ evtx2json /path/to/your/file.evtx /path/to/output/target.json
+$ evtx2json /path/to/your/file.evtx -o /path/to/output/target.json
 ```
 
 Use `--format jsonl` (or `ndjson`) to write one record per line.
